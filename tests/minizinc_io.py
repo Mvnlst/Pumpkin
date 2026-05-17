@@ -8,10 +8,21 @@ def create_instance_folder(n, k, seed):
     return folder
 
 # Write the dzn file to the correct location
-def write_dzn(edges, n, k, seed, folder):
+def write_dzn(edges, n, k, seed, folder, sb_count=None, ap_count=None):
     filename = f"{folder}/instance.dzn"
 
     with open(filename, "w") as f:
+        # info about the problem
+        f.write(f"% n = {n}\n") 
+        f.write(f"% k = {k}\n")
+        f.write(f"% seed = {seed}\n")
+        if sb_count is not None:
+            f.write(f"% strong bridges = {sb_count}\n")
+        if ap_count is not None:
+            f.write(f"% articulation points = {ap_count}\n")
+        f.write("\n")
+
+        # actual problem instance
         f.write(f"n = {n};\n")
 
         f.write("allowed = [\n")
