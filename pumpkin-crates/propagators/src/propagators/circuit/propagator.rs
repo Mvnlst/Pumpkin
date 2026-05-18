@@ -96,9 +96,11 @@ impl<Var: IntegerVariable + 'static> Propagator for CircuitPropagator<Var> {
     }
 
     fn propagate_from_scratch(&self, mut context: PropagationContext) -> PropagationStatusCP {
+        // Should happen only on first call; check for single SCC here as well
         self.remove_self_loops(&mut context)?;
         self.check(context.domains())?;
-        self.prevent(context)
+        self.strong_bridge_prevent(&mut context)?;
+        self.prevent(&mut context)
     }
 }
 
@@ -115,8 +117,188 @@ impl<Var: IntegerVariable + 'static> CircuitPropagator<Var> {
     }
 }
 
+impl<Var: IntegerVariable + 'static> CircuitPropagator<Var> {    
+    fn strong_bridge_prevent(&self, context: &mut PropagationContext) -> PropagationStatusCP {
+        // Validate graph is a single SCC
+        if !self.is_strongly_connected(context) {
+            //TODO: Add proper explanation and error; if not a single SCC circuit can never hold
+            return Ok(());
+        }
+        
+        // Detect strong bridges, which will be edges that have to be enforced. Also keep track of how far you can reach from that node.
+        let mut required_edges: Vec<(usize, usize, Vec<bool>)> = Vec::new();
+
+
+        // Loop over every node
+        for (u, node) in self.successors.iter().enumerate() {
+            let domain: Vec<i32> = context.iterate_domain(node).collect();
+
+            // If only one value, already fixed
+            if domain.len() <= 1 {
+                continue;
+            }
+
+            // Check for every edge if it is a strong bridge; can u reach v without taking direct edge?
+            for v in domain {
+                let v = domain_value_to_index(v);
+                let (reachable, visited) = self.reachable_without_edge(context, u, v);
+                if !reachable {
+                    required_edges.push((u, v, visited));
+                }
+            }
+
+        }
+        
+        // Enforce the required_edges. Every u needs to go to v.
+        for (u, v, visited) in required_edges {
+            let reason = self.create_strong_bridge_explanation(context.domains(), &visited);
+
+            context.post(
+                predicate!(self.successors[u] == index_to_domain_value(v)),
+                reason,
+                &self.inference_code,
+            )?;
+        }
+        
+        
+        
+        Ok(())
+    }
+
+    fn create_strong_bridge_explanation(&self, context: Domains, visited: &[bool]) -> PropositionalConjunction {
+        let mut explanation = Vec::new();
+
+        for (node_index, &reachable) in visited.iter().enumerate() {
+            if !reachable {
+                continue;
+            }
+
+            let node = &self.successors[node_index];
+
+            let domain_id = node.lower_bound_predicate(0).get_domain();
+
+            let initial_domain: Vec<i32>  = context.iterate_initial_domain(domain_id).collect();
+
+            for domain_value in initial_domain {
+                let i = domain_value_to_index(domain_value);
+                if !visited[i] {
+                    // We find an edge that crosses reachable -> unreachable.
+                    // This implicitly means this edge is not included in the current state, as otherwise "i" would have been reachable
+                    explanation.push(predicate!(
+                        node != domain_value
+                    ));
+                }
+            }
+        }
+        return explanation.into_iter().collect();
+    }
+    
+    fn reachable_without_edge(&self, context: &PropagationContext, start: usize, target: usize) -> (bool, Vec<bool>) {
+
+        let n = self.successors.len();
+        let mut visited = vec![false; n];
+        let mut stack = vec![start];
+
+        while let Some(current_node_index) = stack.pop() {
+
+            if visited[current_node_index] {
+                continue;
+            }
+
+            visited[current_node_index] = true;
+            
+            
+            if current_node_index == target {
+                return (true, visited);
+            }
+
+            let current_node = &self.successors[current_node_index];
+
+            for next in context.iterate_domain(current_node) {
+                let next_node_index = domain_value_to_index(next);
+
+                // Skip edge if it is the direct connection between start and target
+                if current_node_index == start && next_node_index == target {
+                    continue;
+                }
+
+                if !visited[next_node_index] {
+                    stack.push(next_node_index);
+                }
+            }
+        }
+
+        (false, visited)
+    }
+
+    
+    // Makes sure the graph is strongly connected
+    fn is_strongly_connected(&self, context: &PropagationContext) -> bool {
+        let n = self.successors.len();
+
+        if n <= 1 {return true;}
+
+        let mut visited = vec![false; n];
+        self.dfs_forward(context, 0, &mut visited);
+
+        if visited.iter().any(|&x| !x) {
+            return false;
+        }
+
+        let mut visited_reverse = vec![false; n];
+        self.dfs_backward(context, 0, &mut visited_reverse);
+
+        if visited_reverse.iter().any(|&x| !x) {
+            return false;
+        }
+
+        true
+    }
+
+    // Check if we can reach all nodes from a starting node
+    fn dfs_forward(&self, context: &PropagationContext, start: usize, visited: &mut Vec<bool>) {
+        let mut stack = vec![start];
+
+        while let Some(node_index) = stack.pop() {
+            if visited[node_index] {
+                continue;
+            }
+            visited[node_index] = true;
+
+            let node: &Var = &self.successors[node_index];
+
+            for domain_value in context.iterate_domain(node) {
+                let v = domain_value_to_index(domain_value);
+                if v < self.successors.len() && !visited[v] {
+                    stack.push(v);
+                }
+            }
+        }
+    }
+
+    // Check if we can reach the starting node from all nodes
+    fn dfs_backward(&self, context: &PropagationContext, start: usize, visited_reverse: &mut Vec<bool>) {
+        let mut stack = vec![start];
+
+        while let Some(node_index) = stack.pop() {
+            if visited_reverse[node_index] {
+                continue;
+            }
+            visited_reverse[node_index] = true;
+
+            for (i, node) in self.successors.iter().enumerate() {
+                for v in context.iterate_domain(node) {
+                    if domain_value_to_index(v) == node_index {
+                        stack.push(i);
+                    }
+                }
+            }
+        }
+    }
+}   
+
 impl<Var: IntegerVariable + 'static> CircuitPropagator<Var> {
-    fn prevent(&self, mut context: PropagationContext) -> PropagationStatusCP {
+    fn prevent(&self, context: &mut PropagationContext) -> PropagationStatusCP {
         // collect all nodes that have an incoming enforced/fixed edge, these cannot be start of possible chains
         let mut has_incoming_edge = FixedBitSet::with_capacity(self.successors.len());
         // for every fixed edge we find, we follow it and add the resulting node to the list

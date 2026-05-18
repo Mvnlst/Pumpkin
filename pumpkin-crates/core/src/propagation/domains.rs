@@ -125,6 +125,10 @@ pub trait ReadDomains {
     /// lower-bound and upper-bound values).
     fn iterate_domain<Var: IntegerVariable>(&self, var: &Var) -> impl Iterator<Item = i32>;
 
+    /// Returns an [`Iterator`] over the values in the initial domain of the provided `var` (including the
+    /// lower-bound and upper-bound values), using the domain at the time of its creation.
+    fn iterate_initial_domain(&self, domain_id: DomainId) -> impl Iterator<Item = i32>;
+
     /// Returns whether the provided [`Predicate`] was posted as a decision (i.e., it was posted as
     /// a [`Predicate`] without a reason).
     fn is_decision_predicate(&self, predicate: Predicate) -> bool;
@@ -229,6 +233,14 @@ impl<T: HasAssignments> ReadDomains for T {
 
     fn iterate_domain<Var: IntegerVariable>(&self, var: &Var) -> impl Iterator<Item = i32> {
         var.iterate_domain(self.assignments())
+    }
+
+    fn iterate_initial_domain(&self, domain_id: DomainId) -> impl Iterator<Item = i32> {
+        let lb = self.initial_lower_bound(domain_id);
+        let ub = self.initial_upper_bound(domain_id);
+        let holes = self.initial_holes(domain_id);
+
+        (lb..=ub).filter(move |v| !holes.contains(v))
     }
 
     fn is_decision_predicate(&self, predicate: Predicate) -> bool {

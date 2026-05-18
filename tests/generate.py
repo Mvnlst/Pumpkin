@@ -37,4 +37,4 @@ if __name__ == "__main__":
             print("k will be restricted to k < n")
         generate_and_save(n, k)
     else:
-        print("Usage: python generate_instances.py n k (optional: seed)")
+        print("Usage: python generate.py n k (optional: seed)")
