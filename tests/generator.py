@@ -70,4 +70,46 @@ def generate_instance(n, k, seed=None):
     # Close the cycle by adding an edge from last node to the starting one
     edges[current].add(order[0])
 
-    return edges, order
+    return edges, order, count_strong_bridges(edges)
+
+def count_strong_bridges(edges):
+    n = len(edges)
+    strong_bridges = []
+
+    for u in range(n):
+        if len(edges[u]) <= 1: continue
+        for v in list(edges[u]):
+            reachable = reachable_without_edge(edges, u, v)
+
+            if not reachable:
+                strong_bridges.append((u + 1, v + 1))
+
+    return strong_bridges
+
+def reachable_without_edge(edges, start, target):
+    n = len(edges)
+    visited = [False] * n
+    stack = [start]
+
+    while stack:
+        u = stack.pop()
+
+        if visited[u]:
+            continue
+
+        visited[u] = True
+
+        if u == target:
+            return True
+
+        for v in edges[u]:
+
+            # skip the tested edge
+            if u == start and v == target:
+                continue
+
+            if not visited[v]:
+                stack.append(v)
+
+    return False
+

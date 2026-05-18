@@ -11,10 +11,10 @@ def generate_and_save(n, k, seed=None, model_file="models/circuit_model.mzn"):
     folder = create_instance_folder(n, k, seed)
 
     # Generate graph
-    edges, order = generate_instance(n, k, seed)
+    edges, order, strong_bridges = generate_instance(n, k, seed)
 
     # Write instance
-    dzn_file = write_dzn(edges, n, k, seed, folder)
+    dzn_file = write_dzn(edges, n, k, seed, folder, strong_bridges)
 
     # Compile to FlatZinc
     fzn_file = compile_fzn(model_file, dzn_file, folder)
