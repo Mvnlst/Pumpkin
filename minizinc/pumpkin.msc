@@ -1,6 +1,6 @@
 {
     "name": "Pumpkin",
-    "id": "nl.tudelft.algorithmics.pumpkin",
+    "id": "nl.tudelft.algorithmics.pumpkin-strong-bridge",
     "version": "0.1",
     "executable": "../target/release/pumpkin-solver",
     "mznlib": "./lib",

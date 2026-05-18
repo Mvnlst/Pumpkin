@@ -40,12 +40,12 @@ def write_dzn(edges, n, k, seed, folder, strong_bridges):
 
 # Compile the fzn file and put it in the right location with the -o flag
 # Prevent ozn file from generating
-def compile_fzn(model_file, dzn_file, folder):
+def compile_fzn(model_file, dzn_file, folder: str):
     fzn_file = os.path.join(folder, "instance.fzn")
 
     cmd = [
         "minizinc",
-        "--solver", "pumpkin",
+        "--solver", "pumpkin-strong-bridge",
         "--compile",
         "--no-output-ozn",
         "-o", fzn_file,
@@ -60,6 +60,7 @@ def compile_fzn(model_file, dzn_file, folder):
         print("Error compiling")
         print(result.stderr)
     else:
-        print(f"Compiled successfully: {folder}")
+        correctString = folder.replace("\\", "/")
+        print(f"minizinc --solver pumpkin-strong-bridge {correctString}" + "/instance.fzn")
 
     return fzn_file

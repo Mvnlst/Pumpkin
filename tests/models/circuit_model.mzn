@@ -12,6 +12,6 @@ constraint forall(i in 1..n)(
     )
 );
 
-constraint circuit(x);
+constraint pumpkin_circuit(x);
 
 solve satisfy;
