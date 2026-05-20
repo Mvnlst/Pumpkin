@@ -34,6 +34,7 @@ pub struct CircuitPropagator<Var> {
     pub successors: Box<[Var]>,
     // fields (and maybe extra ones)
     inference_code: InferenceCode,
+    // add log statistic in this struct
 }
 
 // The whole propagator constructor itself
@@ -101,6 +102,11 @@ impl<Var: IntegerVariable + 'static> Propagator for CircuitPropagator<Var> {
         self.check(context.domains())?;
         self.strong_bridge_prevent(&mut context)?;
         self.prevent(&mut context)
+    
+    }
+
+    fn log_statistics(&self, _statistic_logger: pumpkin_core::statistics::StatisticLogger) {
+        // log statistic of strong bridge domain reduction
     }
 }
 
@@ -162,6 +168,8 @@ impl<Var: IntegerVariable + 'static> CircuitPropagator<Var> {
     }
 
     fn create_strong_bridge_explanation(&self, context: Domains, visited: &[bool], u: usize, v: usize) -> PropositionalConjunction {
+        // Different option: Provide Generic explanations by giving the WHOLE context as reason
+        
         let mut explanation = Vec::new();
 
         for (node_index, &reachable) in visited.iter().enumerate() {
@@ -619,6 +627,27 @@ mod tests {
         let result = state.propagate_to_fixed_point();
         assert!(result.is_ok(), "2-cycle is a valid Hamiltonian cycle");
         assert!(state.get_domains().contains(&x6, 5), "Strong bridge must be enforced!")
+    }
+
+    #[test]
+    fn circuit_strong_bridge2() {
+        let mut state = State::default();
+
+        let x1 = state.new_sparse_variable(vec![2, 5], None);
+        let x2 = state.new_sparse_variable(vec![1, 3, 4], None);
+        let x3 = state.new_sparse_variable(vec![2, 5], None);
+        let x4 = state.new_sparse_variable(vec![3], None);
+        let x5 = state.new_sparse_variable(vec![1, 2], None);
+
+        let constraint_tag = state.new_constraint_tag();
+        let _ = state.add_propagator(CircuitConstructor {
+            successors: vec![x1, x2, x3, x4, x5].into(),
+            constraint_tag,
+        });
+
+        let result = state.propagate_to_fixed_point();
+        assert!(result.is_ok(), "2-cycle is a valid Hamiltonian cycle");
+        // assert!(!state.get_domains().contains(&x5, 2), "Strong bridge must be enforced!")
     }
 
 }

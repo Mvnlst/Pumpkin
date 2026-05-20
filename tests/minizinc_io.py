@@ -61,6 +61,9 @@ def compile_fzn(model_file, dzn_file, folder: str):
         print(result.stderr)
     else:
         correctString = folder.replace("\\", "/")
-        print(f"minizinc --solver pumpkin-strong-bridge {correctString}" + "/instance.fzn")
+        print(f"minizinc --solver pumpkin-strong-bridge {correctString}" + "/instance.fzn -s")
+        print(f"cargo run -p pumpkin-solver {correctString}" + "/instance.fzn -s")
+        print(f"cargo run -p pumpkin-solver --features=debug-checks {correctString}" + "/instance.fzn -s")
+        print(f"cargo run -p pumpkin-solver --conflict-resolver=no-learning {correctString}" + "/instance.fzn -s")
 
     return fzn_file
