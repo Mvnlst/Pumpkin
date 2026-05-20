@@ -97,6 +97,8 @@ impl<Var: IntegerVariable + 'static> Propagator for CircuitPropagator<Var> {
     }
 
     fn propagate_from_scratch(&self, mut context: PropagationContext) -> PropagationStatusCP {
+        // eprintln!("starting domain (when entering propagate_from_scratch: ");
+        // self.print_current_domains(&mut context);
         // Should happen only on first call; check for single SCC here as well
         self.remove_self_loops(&mut context)?;
         self.check(context.domains())?;
@@ -125,10 +127,14 @@ impl<Var: IntegerVariable + 'static> CircuitPropagator<Var> {
 
 impl<Var: IntegerVariable + 'static> CircuitPropagator<Var> {    
     fn strong_bridge_prevent(&self, context: &mut PropagationContext) -> PropagationStatusCP {
+        // eprintln!("Current domains when entering strong_bridge_prevent: ");
+        // self.print_current_domains(context);
         // Validate graph is a single SCC
         if !self.is_strongly_connected(context) {
-            //TODO: Add proper explanation and error; if not a single SCC circuit can never hold
-            return Ok(());
+            return Err(Conflict::Propagator(PropagatorConflict {
+                        conjunction: self.create_full_graph_explanation(context.domains()),
+                        inference_code: self.inference_code.clone(),
+                }));
         }
         
         // Detect strong bridges, which will be edges that have to be enforced. Also keep track of how far you can reach from that node.
@@ -157,7 +163,9 @@ impl<Var: IntegerVariable + 'static> CircuitPropagator<Var> {
         
         // Enforce the required_edges. Every u needs to go to v.
         for (u, v, visited) in required_edges {
+            eprintln!("Enforce edge {} -> {} as this is a strong bridge.", u + 1, v + 1);
             let reason = self.create_strong_bridge_explanation(context.domains(), &visited, u, v);
+            // let reason = self.create_full_graph_explanation(context.domains());
             context.post(
                 predicate!(self.successors[u] == index_to_domain_value(v)),
                 reason,
@@ -167,10 +175,24 @@ impl<Var: IntegerVariable + 'static> CircuitPropagator<Var> {
         Ok(())
     }
 
+    fn print_current_domains(&self, context: &mut PropagationContext) {
+        let domains = context.domains();
+        let mut i: i32 = 1;
+        for node in &self.successors {
+            print!("x{}: ", i);
+            for domain_value in domains.iterate_domain(node){
+                print!("{}, ", domain_value);
+            }
+            println!("");
+            i = i + 1;
+        }
+    }
+
     fn create_strong_bridge_explanation(&self, context: Domains, visited: &[bool], u: usize, v: usize) -> PropositionalConjunction {
         // Different option: Provide Generic explanations by giving the WHOLE context as reason
         
         let mut explanation = Vec::new();
+        
 
         for (node_index, &reachable) in visited.iter().enumerate() {
             if !reachable {
@@ -182,18 +204,23 @@ impl<Var: IntegerVariable + 'static> CircuitPropagator<Var> {
             let domain_id = node.lower_bound_predicate(0).get_domain();
 
             let initial_domain: Vec<i32>  = context.iterate_initial_domain(domain_id).collect();
+            
+            let current_domain: Vec<i32> = context.iterate_domain(node).collect();
 
             for domain_value in initial_domain {
-                let domain: Vec<i32> = context.iterate_domain(node).collect();
-                if !domain.contains(&domain_value){
-
+                if !current_domain.contains(&domain_value) {
+                    // i is the 0-based index of the node to which there was an edge in the initial problem, but currently that edge is pruned.
                     let i = domain_value_to_index(domain_value);
+
+                    // i should never be visited by default. We also make sure we do not accidentally include the strong bridge in the reason
                     if !visited[i] && !(node_index == u && i == v) {
-                        // We find an edge that crosses reachable -> unreachable.
+                        // We find an edge that crosses reachable -> unreachable, it is currently pruned however.
                         // This implicitly means this edge is not included in the current state, as otherwise "i" would have been reachable
                         explanation.push(predicate!(
                             node != domain_value
                         ));
+                        eprintln!("    We use the fact that {} -> {} is pruned.", node_index + 1, domain_value);
+                        eprintln!(" ");
                     }
                 }
             }
@@ -303,6 +330,34 @@ impl<Var: IntegerVariable + 'static> CircuitPropagator<Var> {
             }
         }
     }
+
+    fn create_full_graph_explanation(&self, context: Domains) -> PropositionalConjunction {
+        
+        let mut explanation = Vec::new();
+
+        for node in &self.successors {
+
+            let lb = context.lower_bound(node);
+            
+            explanation.push(predicate!(
+                node >= lb
+            ));
+
+            let ub = context.upper_bound(node);
+            explanation.push(predicate!(
+                node <= ub
+            ));
+            
+            for hole in context.get_holes(node) {
+                explanation.push(predicate!(
+                    node != hole
+                ));
+            }
+
+        }
+
+        explanation.into_iter().collect()
+    }
 }   
 
 impl<Var: IntegerVariable + 'static> CircuitPropagator<Var> {
@@ -348,6 +403,7 @@ impl<Var: IntegerVariable + 'static> CircuitPropagator<Var> {
             // the length of the chain is not n: if we have not visited all nodes yet we cannot return to the starting node already.
             if context.contains(&self.successors[next], index_to_domain_value(unmarked)) && chain.len() + 1< self.successors.len() {
                 let reason = self.create_prevent_explanation(context.domains(), &chain);
+                eprintln!("Prune edge {} -> {} for cycle prevention.", next + 1, unmarked + 1);
                 context.post(
                     predicate!(self.successors[next] != index_to_domain_value(unmarked)),
                     reason,
@@ -679,6 +735,27 @@ mod tests {
             result.is_err(),
             "A possible graph with an articulation point cannot contain a Hamiltonian circuit"
         );
+    }
+
+    #[test]
+    fn circuit_strong_bridge3() {
+        let mut state = State::default();
+
+        let x1 = state.new_sparse_variable(vec![4, 5], None);
+        let x2 = state.new_sparse_variable(vec![1, 3], None);
+        let x3 = state.new_sparse_variable(vec![4], None);
+        let x4 = state.new_sparse_variable(vec![2, 3], None);
+        let x5 = state.new_sparse_variable(vec![3], None);
+
+        let constraint_tag = state.new_constraint_tag();
+        let _ = state.add_propagator(CircuitConstructor {
+            successors: vec![x1, x2, x3, x4, x5].into(),
+            constraint_tag,
+        });
+
+        let result = state.propagate_to_fixed_point();
+        assert!(result.is_ok(), "2-cycle is a valid Hamiltonian cycle");
+        // assert!(!state.get_domains().contains(&x5, 2), "Strong bridge must be enforced!")
     }
 
 }
