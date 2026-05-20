@@ -337,6 +337,11 @@ impl<Var: IntegerVariable + 'static> CircuitPropagator<Var> {
                 chain.push(next);
                 // And continue to unfold the chain from there. As the domains themselves are 1-indexed, we need to transform them to 0-indexed for our own array.
                 next = domain_value_to_index(fixed_value_next);
+
+                // If the chain already contained this node, we found a subcycle due to our previous prunings in this method call
+                if chain.contains(&next) {
+                    break;
+                }
             }
 
             // We have found a chain. If the last node in the chain has a possible edge to the starting node, we prune that edge only if
@@ -371,6 +376,8 @@ impl<Var: IntegerVariable + 'static> CircuitPropagator<Var> {
             })
             .collect()
     }
+
+    
 }    
 
 impl<Var: IntegerVariable + 'static> CircuitPropagator<Var> {
@@ -648,6 +655,30 @@ mod tests {
         let result = state.propagate_to_fixed_point();
         assert!(result.is_ok(), "2-cycle is a valid Hamiltonian cycle");
         // assert!(!state.get_domains().contains(&x5, 2), "Strong bridge must be enforced!")
+    }
+
+    #[test]
+    fn circuit_articulation_point_conflict() {
+        let mut state = State::default();
+
+        let x1 = state.new_interval_variable(2, 2, None);
+        let x2 = state.new_interval_variable(1, 4, None);
+        let x3 = state.new_interval_variable(2, 2, None);
+        let x4 = state.new_interval_variable(2, 2, None);
+
+        let constraint_tag = state.new_constraint_tag();
+
+        let _ = state.add_propagator(CircuitConstructor {
+            successors: vec![x1, x2, x3, x4].into(),
+            constraint_tag,
+        });
+
+        let result = state.propagate_to_fixed_point();
+
+        assert!(
+            result.is_err(),
+            "A possible graph with an articulation point cannot contain a Hamiltonian circuit"
+        );
     }
 
 }
