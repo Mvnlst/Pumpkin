@@ -58,12 +58,12 @@ where
             .for_each(|(index, successor)| {
                 context.register(
                     successor.clone(),
-                    DomainEvents::ASSIGN,
+                    DomainEvents::ANY_INT,
                     LocalId::from(index as u32),
                 );
                 context.register_backtrack(
                     successor.clone(),
-                    DomainEvents::ASSIGN,
+                    DomainEvents::ANY_INT,
                     LocalId::from(index as u32),
                 );
             });
@@ -228,6 +228,7 @@ impl<Var: IntegerVariable + 'static> CircuitPropagator<Var> {
         return explanation.into_iter().collect();
     }
     
+    // TODO: Rust macros
     fn reachable_without_edge(&self, context: &PropagationContext, start: usize, target: usize) -> (bool, Vec<bool>) {
 
         let n = self.successors.len();
