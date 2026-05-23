@@ -19,6 +19,8 @@ use pumpkin_core::variables::IntegerVariable;
 use pumpkin_core::propagation::InferenceCheckers;
 
 use crate::circuit::CircuitChecker;
+use crate::circuit::SCCChecker;
+use crate::circuit::StrongBridgeChecker;
 
 
 // constructor for the propagator. ConstraintTag is for proof logging
@@ -34,6 +36,8 @@ pub struct CircuitPropagator<Var> {
     pub successors: Box<[Var]>,
     // fields (and maybe extra ones)
     inference_code: InferenceCode,
+    strong_bridge_code: InferenceCode,
+    scc_code: InferenceCode,
     // add log statistic in this struct
 }
 
@@ -73,6 +77,8 @@ where
             // set variables to base values
             successors: self.successors,
             inference_code: InferenceCode::new(self.constraint_tag, CircuitPrevent),
+            strong_bridge_code: InferenceCode::new(self.constraint_tag, StrongBridge),
+            scc_code: InferenceCode::new(self.constraint_tag, SCCCheck),
         }
     }
 
@@ -84,10 +90,24 @@ where
                 successors: self.successors.clone(),
             }),
         );
+        checkers.add_inference_checker(
+            InferenceCode::new(self.constraint_tag, StrongBridge),
+            Box::new(StrongBridgeChecker {
+                successors: self.successors.clone(),
+            }),
+        );
+        checkers.add_inference_checker(
+            InferenceCode::new(self.constraint_tag, SCCCheck),
+            Box::new(SCCChecker {
+                successors: self.successors.clone(),
+            }),
+        );
     }
 }
 
 declare_inference_label!(CircuitPrevent);
+declare_inference_label!(StrongBridge);
+declare_inference_label!(SCCCheck);
 
 
 // here comes an implementation of Propagator which has some basic functions (like defining the name) but also important functions propagate() and propagate_from_scratch()
@@ -97,14 +117,11 @@ impl<Var: IntegerVariable + 'static> Propagator for CircuitPropagator<Var> {
     }
 
     fn propagate_from_scratch(&self, mut context: PropagationContext) -> PropagationStatusCP {
-        // eprintln!("starting domain (when entering propagate_from_scratch: ");
-        // self.print_current_domains(&mut context);
         // Should happen only on first call; check for single SCC here as well
         self.remove_self_loops(&mut context)?;
         self.check(context.domains())?;
-        self.strong_bridge_prevent(&mut context)?;
-        self.prevent(&mut context)
-    
+        self.prevent(&mut context)?;
+        self.strong_bridge_prevent(&mut context)
     }
 
     fn log_statistics(&self, _statistic_logger: pumpkin_core::statistics::StatisticLogger) {
@@ -127,15 +144,14 @@ impl<Var: IntegerVariable + 'static> CircuitPropagator<Var> {
 
 impl<Var: IntegerVariable + 'static> CircuitPropagator<Var> {    
     fn strong_bridge_prevent(&self, context: &mut PropagationContext) -> PropagationStatusCP {
-        // eprintln!("Current domains when entering strong_bridge_prevent: ");
-        // self.print_current_domains(context);
         // Validate graph is a single SCC
         if !self.is_strongly_connected(context) {
             return Err(Conflict::Propagator(PropagatorConflict {
                         conjunction: self.create_full_graph_explanation(context.domains()),
-                        inference_code: self.inference_code.clone(),
+                        inference_code: self.scc_code.clone(),
                 }));
         }
+        // self.print_current_domains(context);
         
         // Detect strong bridges, which will be edges that have to be enforced. Also keep track of how far you can reach from that node.
         let mut required_edges: Vec<(usize, usize, Vec<bool>)> = Vec::new();
@@ -163,13 +179,13 @@ impl<Var: IntegerVariable + 'static> CircuitPropagator<Var> {
         
         // Enforce the required_edges. Every u needs to go to v.
         for (u, v, visited) in required_edges {
-            eprintln!("Enforce edge {} -> {} as this is a strong bridge.", u + 1, v + 1);
+            // eprintln!("Enforce edge {} -> {} as this is a strong bridge.", u + 1, v + 1);
             let reason = self.create_strong_bridge_explanation(context.domains(), &visited, u, v);
             // let reason = self.create_full_graph_explanation(context.domains());
             context.post(
                 predicate!(self.successors[u] == index_to_domain_value(v)),
                 reason,
-                &self.inference_code,
+                &self.strong_bridge_code,
             )?;
         }
         Ok(())
@@ -219,8 +235,6 @@ impl<Var: IntegerVariable + 'static> CircuitPropagator<Var> {
                         explanation.push(predicate!(
                             node != domain_value
                         ));
-                        eprintln!("    We use the fact that {} -> {} is pruned.", node_index + 1, domain_value);
-                        eprintln!(" ");
                     }
                 }
             }
@@ -404,7 +418,6 @@ impl<Var: IntegerVariable + 'static> CircuitPropagator<Var> {
             // the length of the chain is not n: if we have not visited all nodes yet we cannot return to the starting node already.
             if context.contains(&self.successors[next], index_to_domain_value(unmarked)) && chain.len() + 1< self.successors.len() {
                 let reason = self.create_prevent_explanation(context.domains(), &chain);
-                eprintln!("Prune edge {} -> {} for cycle prevention.", next + 1, unmarked + 1);
                 context.post(
                     predicate!(self.successors[next] != index_to_domain_value(unmarked)),
                     reason,
