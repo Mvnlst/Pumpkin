@@ -29,7 +29,7 @@ def write_dzn(edges, n, k, seed, folder, strong_bridges):
             # Convert to 1-based indexing
             row_str = ", ".join(str(j+1) for j in row)
 
-            f.write(f"    [{row_str}]")
+            f.write(f"    {{{row_str}}}")
             if i < n - 1:
                 f.write(",\n")
             else:
