@@ -1,5 +1,6 @@
 use fixedbitset::FixedBitSet;
 use pumpkin_core::conjunction;
+use pumpkin_core::create_statistics_struct;
 use pumpkin_core::declare_inference_label;
 use pumpkin_core::predicate;
 use pumpkin_core::predicates::PropositionalConjunction;
@@ -15,6 +16,8 @@ use pumpkin_core::propagation::ReadDomains;
 use pumpkin_core::state::Conflict;
 use pumpkin_core::state::PropagationStatusCP;
 use pumpkin_core::state::PropagatorConflict;
+use pumpkin_core::statistics;
+use pumpkin_core::statistics::Statistic;
 use pumpkin_core::variables::IntegerVariable;
 use pumpkin_core::propagation::InferenceCheckers;
 
@@ -38,7 +41,7 @@ pub struct CircuitPropagator<Var> {
     inference_code: InferenceCode,
     strong_bridge_code: InferenceCode,
     scc_code: InferenceCode,
-    // add log statistic in this struct
+    statistics: StrongBridgeStatistics,
 }
 
 // The whole propagator constructor itself
@@ -79,6 +82,7 @@ where
             inference_code: InferenceCode::new(self.constraint_tag, CircuitPrevent),
             strong_bridge_code: InferenceCode::new(self.constraint_tag, StrongBridge),
             scc_code: InferenceCode::new(self.constraint_tag, SCCCheck),
+            statistics: StrongBridgeStatistics::default(),
         }
     }
 
@@ -109,6 +113,11 @@ declare_inference_label!(CircuitPrevent);
 declare_inference_label!(StrongBridge);
 declare_inference_label!(SCCCheck);
 
+ create_statistics_struct!(StrongBridgeStatistics {
+            number_of_sb_propagations: usize,
+            number_of_scc_propagations: usize,
+        });
+
 
 // here comes an implementation of Propagator which has some basic functions (like defining the name) but also important functions propagate() and propagate_from_scratch()
 impl<Var: IntegerVariable + 'static> Propagator for CircuitPropagator<Var> {
@@ -124,8 +133,9 @@ impl<Var: IntegerVariable + 'static> Propagator for CircuitPropagator<Var> {
         self.strong_bridge_prevent(&mut context)
     }
 
-    fn log_statistics(&self, _statistic_logger: pumpkin_core::statistics::StatisticLogger) {
-        // log statistic of strong bridge domain reduction
+    fn log_statistics(&self, statistic_logger: pumpkin_core::statistics::StatisticLogger) {
+        self.statistics.log(statistic_logger.clone());
+        // TODO: this should be at a different location
     }
 }
 
@@ -146,6 +156,7 @@ impl<Var: IntegerVariable + 'static> CircuitPropagator<Var> {
     fn strong_bridge_prevent(&self, context: &mut PropagationContext) -> PropagationStatusCP {
         // Validate graph is a single SCC
         if !self.is_strongly_connected(context) {
+            // self.statistics.number_of_scc_propagations += 1;
             return Err(Conflict::Propagator(PropagatorConflict {
                         conjunction: self.create_full_graph_explanation(context.domains()),
                         inference_code: self.scc_code.clone(),
@@ -180,6 +191,7 @@ impl<Var: IntegerVariable + 'static> CircuitPropagator<Var> {
         // Enforce the required_edges. Every u needs to go to v.
         for (u, v, visited) in required_edges {
             // eprintln!("Enforce edge {} -> {} as this is a strong bridge.", u + 1, v + 1);
+            // self.statistics.number_of_sb_propagations += 1;
             let reason = self.create_strong_bridge_explanation(context.domains(), &visited, u, v);
             // let reason = self.create_full_graph_explanation(context.domains());
             context.post(
@@ -191,18 +203,18 @@ impl<Var: IntegerVariable + 'static> CircuitPropagator<Var> {
         Ok(())
     }
 
-    fn print_current_domains(&self, context: &mut PropagationContext) {
-        let domains = context.domains();
-        let mut i: i32 = 1;
-        for node in &self.successors {
-            print!("x{}: ", i);
-            for domain_value in domains.iterate_domain(node){
-                print!("{}, ", domain_value);
-            }
-            println!("");
-            i = i + 1;
-        }
-    }
+    // fn print_current_domains(&self, context: &mut PropagationContext) {
+    //     let domains = context.domains();
+    //     let mut i: i32 = 1;
+    //     for node in &self.successors {
+    //         print!("x{}: ", i);
+    //         for domain_value in domains.iterate_domain(node){
+    //             print!("{}, ", domain_value);
+    //         }
+    //         println!("");
+    //         i = i + 1;
+    //     }
+    // }
 
     fn create_strong_bridge_explanation(&self, context: Domains, visited: &[bool], u: usize, v: usize) -> PropositionalConjunction {
         // Different option: Provide Generic explanations by giving the WHOLE context as reason
