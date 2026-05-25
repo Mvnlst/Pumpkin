@@ -5,18 +5,16 @@ import subprocess
 import csv
 import os
 from concurrent.futures import ProcessPoolExecutor, as_completed
-from multiprocessing import Lock
 
-N_VALUES = [20, 40] # which different n's we explore
-K_VALUES = [2, 4] # which different k's we explore
-INSTANCE_AMOUNT = 2 # how many times we generate an instance for each (n, k) combination to average over afterwards
+N_VALUES = [20, 40, 60, 80, 100] # which different n's we explore
+K_VALUES = [2, 4, 7, 10] # which different k's we explore
+INSTANCE_AMOUNT = 20 # how many times we generate an instance for each (n, k) combination to average over afterwards
 TIMEOUT = 15 * 60 # 15 minutes
 if len(sys.argv) < 2:
     raise ValueError("Usage: python run_experiments.py <seed>")
 
 GLOBAL_SEED = int(sys.argv[1])
 
-write_lock = Lock() # lock for parallelization
 
 rng = random.Random(GLOBAL_SEED)
 ALL_SEEDS = [rng.randint(0, 10**9) for _ in range(len(N_VALUES) * len(K_VALUES) * INSTANCE_AMOUNT)] # all seeds used for generation
@@ -43,6 +41,7 @@ def generate_instances():
     index = 0 # index keeping track of used seeds
     for n in N_VALUES:
         for k in K_VALUES:
+            print(f"generating {INSTANCE_AMOUNT} instances for n = {n} and k = {k}...")
             seeds_for_pair = ALL_SEEDS[index:index+INSTANCE_AMOUNT]
             index += INSTANCE_AMOUNT
 
@@ -62,7 +61,7 @@ def ensure_binary_exists():
 
 
 # Execution
-def run_instances():
+def run_instances(executable):
     tasks = []
 
     index = 0 # index keeping track of used seeds
@@ -75,16 +74,58 @@ def run_instances():
                 tasks.append((n, k, seed))
     
     print(f"Running {len(tasks)} instances in parellel...")
+    completed = 0
+    total = len(tasks)
+    results = []
 
-    
+    # Parellel execution
     with ProcessPoolExecutor(max_workers=8) as executor:
             futures = [
-                executor.submit(run_and_parse_instance, n, k, seed, EXECUTABLE)
+                executor.submit(run_and_parse_instance, n, k, seed, executable)
                 for (n, k, seed) in tasks
             ]
 
             for future in as_completed(futures):
-                future.result()  # raises exceptions if any
+                try:
+                    result = future.result()
+                except Exception as e:
+                    print(f"Worker crashed: {e}")
+                    continue
+
+                if result is None:
+                    print("Warning: got None result")
+                    continue
+
+                results.append(result)
+
+                n, k, seed, stats = result
+
+                completed += 1
+                print(f"{completed}/{total} done (n={n}, k={k})")
+
+
+
+    # Sequential writing
+    with open(OUTPUT_FILE, "a", newline="") as f:
+        writer = csv.writer(f)
+
+        for n, k, seed, stats in results:
+            writer.writerow([
+                n, k, seed,
+                stats.get("nodes", 0),
+                stats.get("restarts", 0),
+                stats.get("peak depth", 0),
+                stats.get("solving time", 0),
+                stats.get("conflicts", 0),
+                stats.get("propagations", 0),
+                stats.get("average conflict size", 0),
+                stats.get("unit nogoods learned", 0),
+                stats.get("average nogood length", 0),
+                stats.get("average backtrack amount", 0),
+                stats.get("average lbd", 0),
+            ])
+
+        print(f"Finished writing {len(results)} rows (expected {total})")
 
     print(f"Analyze the results by running python analyze.py {OUTPUT_FILE}")
     print(f"Compare base vs extension by running python analyze.py {OUTPUT_FILE} [base version]")
@@ -125,10 +166,9 @@ def run_and_parse_instance(n, k, seed, executable):
             "average backtrack amount": -1, 
             "average lbd": -1
         }
-
-    print(f"ran n={n} k={k} and took {stats.get('solving time', -1)} seconds")
-
-    write_instance_result(n, k, seed, stats)
+    
+    
+    return (n, k, seed, stats)
 
 
 def parse_stats(output: str):
@@ -159,28 +199,8 @@ def parse_stats(output: str):
     
     return stats
 
-
-def write_instance_result(n, k, seed, stats):
-    with write_lock:
-        with open(OUTPUT_FILE, "a", newline="") as f:
-            writer = csv.writer(f)
-            writer.writerow([
-                n, k, seed,
-                stats.get("nodes", 0),
-                stats.get("restarts", 0),
-                stats.get("peak depth", 0),
-                stats.get("solving time", 0),
-                stats.get("conflicts", 0),
-                stats.get("propagations", 0),
-                stats.get("average conflict size", 0),
-                stats.get("unit nogoods learned", 0),
-                stats.get("average nogood length", 0),
-                stats.get("average backtrack amount", 0),
-                stats.get("average lbd", 0),
-            ])
-
 # main
 if __name__ == "__main__":
     ensure_binary_exists()
     generate_instances() # generate all instances with correct folder structure
-    run_instances() # run all instances, collect statistics and write the data to the output file
+    run_instances(EXECUTABLE) # run all instances, collect statistics and write the data to the output file
