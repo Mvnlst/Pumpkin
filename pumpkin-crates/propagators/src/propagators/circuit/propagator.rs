@@ -16,7 +16,6 @@ use pumpkin_core::propagation::ReadDomains;
 use pumpkin_core::state::Conflict;
 use pumpkin_core::state::PropagationStatusCP;
 use pumpkin_core::state::PropagatorConflict;
-use pumpkin_core::statistics;
 use pumpkin_core::statistics::Statistic;
 use pumpkin_core::variables::IntegerVariable;
 use pumpkin_core::propagation::InferenceCheckers;
