@@ -1,9 +1,15 @@
 import subprocess
 import os
 
-# Create a folder to group the .dzn and .fzn file
-def create_instance_folder(n, k, seed):
-    folder = f"instances/n{n}_k{k}_seed{seed}"
+# Create a folder to group the .dzn and .fzn file. Used for manual generation through generate.py
+def create_manual_instance_folder(n, k, seed):
+    folder = f"manual_instances/n{n}_k{k}_seed{seed}"
+    os.makedirs(folder, exist_ok=True)
+    return folder
+
+# Create an overarching experiment folder and subfolders for structuring the experiments
+def create_experiment_instance_folder(experiment_seed, instance_n, instance_k, instance_seed):
+    folder = f"experiment{experiment_seed}/n{instance_n}_k{instance_k}/seed{instance_seed}"
     os.makedirs(folder, exist_ok=True)
     return folder
 
@@ -40,12 +46,12 @@ def write_dzn(edges, n, k, seed, folder, strong_bridges):
 
 # Compile the fzn file and put it in the right location with the -o flag
 # Prevent ozn file from generating
-def compile_fzn(model_file, dzn_file, folder: str):
+def compile_fzn(model_file, dzn_file, folder: str, solver: str, manual_instance=False):
     fzn_file = os.path.join(folder, "instance.fzn")
 
     cmd = [
         "minizinc",
-        "--solver", "pumpkin-strong-bridge",
+        "--solver", solver,
         "--compile",
         "--no-output-ozn",
         "-o", fzn_file,
@@ -59,10 +65,8 @@ def compile_fzn(model_file, dzn_file, folder: str):
     if result.returncode != 0:
         print("Error compiling")
         print(result.stderr)
-    else:
+    elif manual_instance:
         correctString = folder.replace("\\", "/")
-        print(f"minizinc --solver pumpkin-strong-bridge {correctString}" + "/instance.fzn -s")
-        print(f"cargo run -p pumpkin-solver {correctString}" + "/instance.fzn -s")
         print(f"cargo run -p pumpkin-solver --features=debug-checks {correctString}" + "/instance.fzn -s")
         print(f"cargo run -p pumpkin-solver --conflict-resolver=no-learning {correctString}" + "/instance.fzn -s")
 

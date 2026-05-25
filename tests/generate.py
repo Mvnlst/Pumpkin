@@ -1,25 +1,43 @@
 from generator import generate_instance
-from minizinc_io import write_dzn, compile_fzn, create_instance_folder
+from minizinc_io import write_dzn, compile_fzn, create_manual_instance_folder, create_experiment_instance_folder
 import random
 import sys
 
-def generate_and_save(n, k, seed=None, model_file="models/circuit_model.mzn"):
-    if seed is None:
-        seed = random.randint(1, 1* 10**6)
+def generate_and_save(n, k, seed=None, model_file="models/circuit_model.mzn", solver="pumpkin-strong-bridge", experiment_seed=None):
+    
 
-    # Create folder
-    folder = create_instance_folder(n, k, seed)
+    if experiment_seed is None:
+        if seed is None:
+            seed = random.randint(1, 1* 10**6)
+        # Create folder
+        folder = create_manual_instance_folder(n, k, seed)
 
-    # Generate graph
-    edges, order, strong_bridges = generate_instance(n, k, seed)
+        # Generate graph
+        edges, order, strong_bridges = generate_instance(n, k, seed)
 
-    # Write instance
-    dzn_file = write_dzn(edges, n, k, seed, folder, strong_bridges)
+        # Write instance
+        dzn_file = write_dzn(edges, n, k, seed, folder, strong_bridges)
 
-    # Compile to FlatZinc
-    fzn_file = compile_fzn(model_file, dzn_file, folder)
+        # Compile to FlatZinc
+        fzn_file = compile_fzn(model_file, dzn_file, folder, solver, True)
 
-    return folder, dzn_file, fzn_file
+        return folder, dzn_file, fzn_file
+    else:
+        if seed is None:
+            raise Exception("Every instance in experiments should have a seed")
+        # Create folder
+        folder = create_experiment_instance_folder(experiment_seed, n, k, seed)
+
+        # Generate graph
+        edges, order, strong_bridges = generate_instance(n, k, seed)
+
+        # Write instance
+        dzn_file = write_dzn(edges, n, k, seed, folder, strong_bridges)
+
+        # Compile to FlatZinc
+        fzn_file = compile_fzn(model_file, dzn_file, folder, solver)
+
+        return folder, dzn_file, fzn_file
 
 # Logic for inputting parameters for test generation
 if __name__ == "__main__":
