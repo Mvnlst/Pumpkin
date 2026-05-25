@@ -5,8 +5,8 @@ import subprocess
 import csv
 import os
 
-N_VALUES = [20, 40, 60, 80] # which different n's we explore
-K_VALUES = [1, 2, 4, 7, 10] # which different k's we explore
+N_VALUES = [20, 40, 60, 80, 100] # which different n's we explore
+K_VALUES = [2, 4, 7, 10] # which different k's we explore
 INSTANCE_AMOUNT = 20 # how many times we generate an instance for each (n, k) combination to average over afterwards
 
 if len(sys.argv) < 2:
@@ -17,7 +17,9 @@ GLOBAL_SEED = int(sys.argv[1])
 rng = random.Random(GLOBAL_SEED)
 ALL_SEEDS = [rng.randint(0, 10**9) for _ in range(len(N_VALUES) * len(K_VALUES) * INSTANCE_AMOUNT)] # all seeds used for generation
 
-OUTPUT_FILE = f"results_sb_seed{GLOBAL_SEED}.csv"
+OUTPUT_DIR = f"experiment{GLOBAL_SEED}"
+os.makedirs(OUTPUT_DIR, exist_ok=True)
+OUTPUT_FILE = f"{OUTPUT_DIR}/results_sb_seed{GLOBAL_SEED}.csv"
 
 
 with open(OUTPUT_FILE, "w", newline="") as f:
@@ -52,10 +54,11 @@ def run_instances():
             for seed in seeds_for_pair:
                 run_and_parse_instance(n, k, seed)
     print(f"Analyze the results by running python analyze.py {OUTPUT_FILE}")
+    print(f"Compare base vs extension by running python analyze.py {OUTPUT_FILE} [base version]")
 
 # Core logic
 def run_and_parse_instance(n, k, seed):
-    folder = f"experiment{GLOBAL_SEED}/n{n}_k{k}/seed{seed}"
+    folder = f"experiment{GLOBAL_SEED}/instances/n{n}_k{k}/seed{seed}"
     fzn_file = os.path.join(folder, "instance.fzn")
     fzn_file = fzn_file.replace("\\", "/")
     

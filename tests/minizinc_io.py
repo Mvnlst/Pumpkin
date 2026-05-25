@@ -9,7 +9,7 @@ def create_manual_instance_folder(n, k, seed):
 
 # Create an overarching experiment folder and subfolders for structuring the experiments
 def create_experiment_instance_folder(experiment_seed, instance_n, instance_k, instance_seed):
-    folder = f"experiment{experiment_seed}/n{instance_n}_k{instance_k}/seed{instance_seed}"
+    folder = f"experiment{experiment_seed}/instances/n{instance_n}_k{instance_k}/seed{instance_seed}"
     os.makedirs(folder, exist_ok=True)
     return folder
 
