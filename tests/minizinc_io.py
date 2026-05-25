@@ -14,7 +14,7 @@ def create_experiment_instance_folder(experiment_seed, instance_n, instance_k, i
     return folder
 
 # Write the dzn file to the correct location
-def write_dzn(edges, n, k, seed, folder, strong_bridges):
+def write_dzn(edges, n, k, seed, folder):
     filename = f"{folder}/instance.dzn"
 
     with open(filename, "w") as f:
@@ -22,8 +22,6 @@ def write_dzn(edges, n, k, seed, folder, strong_bridges):
         f.write(f"% n = {n}\n") 
         f.write(f"% k = {k}\n")
         f.write(f"% seed = {seed}\n")
-        if strong_bridges is not None:
-            f.write(f"% strong bridges = {strong_bridges}\n")
         f.write("\n")
 
         # actual problem instance

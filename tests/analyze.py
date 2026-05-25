@@ -161,4 +161,4 @@ if BASE_FILE is not None:
 # DONE
 # ===============================
 
-print("\nAnalysis complete ✅")
+print("\nAnalysis complete")
