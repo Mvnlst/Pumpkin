@@ -8,14 +8,12 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 
 N_VALUES = [20, 40, 60, 80, 100] # which different n's we explore
 K_VALUES = [2, 4, 7, 10] # which different k's we explore
-INSTANCE_AMOUNT = 20 # how many times we generate an instance for each (n, k) combination to average over afterwards
+INSTANCE_AMOUNT = 200 # how many times we generate an instance for each (n, k) combination to average over afterwards
 TIMEOUT = 15 * 60 # 15 minutes
+
 if len(sys.argv) < 2:
     raise ValueError("Usage: python run_experiments.py <seed>")
-
 GLOBAL_SEED = int(sys.argv[1])
-
-
 rng = random.Random(GLOBAL_SEED)
 ALL_SEEDS = [rng.randint(0, 10**9) for _ in range(len(N_VALUES) * len(K_VALUES) * INSTANCE_AMOUNT)] # all seeds used for generation
 
@@ -24,6 +22,8 @@ os.makedirs(OUTPUT_DIR, exist_ok=True)
 OUTPUT_FILE = f"{OUTPUT_DIR}/results_sb_seed{GLOBAL_SEED}.csv"
 
 EXECUTABLE = os.path.join("..", "target", "release", "pumpkin-solver.exe")
+MAX_WORKERS = 8 # for parallel running of instances
+
 
 
 with open(OUTPUT_FILE, "w", newline="") as f:
@@ -79,7 +79,7 @@ def run_instances(executable):
     results = []
 
     # Parellel execution
-    with ProcessPoolExecutor(max_workers=8) as executor:
+    with ProcessPoolExecutor(max_workers=MAX_WORKERS) as executor:
             futures = [
                 executor.submit(run_and_parse_instance, n, k, seed, executable)
                 for (n, k, seed) in tasks
