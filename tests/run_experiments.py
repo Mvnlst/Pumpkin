@@ -49,15 +49,11 @@ def generate_instances():
                 generate_and_save(n, k, seed, model_file=MODEL_FILE, experiment_seed=GLOBAL_SEED)
 
 def ensure_binary_exists():
-
-    if not os.path.exists(EXECUTABLE):
-        print("Release binary not found. Building with cargo...")
-        subprocess.run(
-            ["cargo", "build", "--release", "-p", "pumpkin-solver"],
-            check=True
-        )
-    else:
-        print("Using existing release build.")
+    print("Building with cargo...")
+    subprocess.run(
+        ["cargo", "build", "--release", "-p", "pumpkin-solver"],
+        check=True
+    )
 
 
 # Execution
