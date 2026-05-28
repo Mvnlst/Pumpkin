@@ -27,6 +27,7 @@ use parsers::dimacs::parse_cnf;
 use pumpkin_conflict_resolvers::resolvers::AnalysisMode;
 use pumpkin_conflict_resolvers::resolvers::NoLearningResolver;
 use pumpkin_conflict_resolvers::resolvers::ResolutionResolver;
+use pumpkin_propagators::circuit::options::CircuitPropagationMethod;
 use pumpkin_propagators::cumulative::options::CumulativeOptions;
 use pumpkin_propagators::cumulative::options::CumulativePropagationMethod;
 use pumpkin_propagators::cumulative::time_table::CumulativeExplanationType;
@@ -394,6 +395,13 @@ struct Args {
     #[arg(long = "cumulative-incremental-backtracking")]
     cumulative_incremental_backtracking: bool,
 
+    /// Determines the type of propagator which is used by the circuit propagator to
+    /// propagate the constraint.
+    ///
+    /// Currently, the solver only supports base cycle prevention and an extension using strong bridges.
+    #[arg(long = "circuit-propagation", value_enum, default_value_t = CircuitPropagationMethod::Base)]
+    circuit_propagation_method: CircuitPropagationMethod,
+
     /// Determine what type of optimisation strategy is used by the solver
     #[arg(long = "optimisation-strategy", value_enum, default_value_t)]
     optimisation_strategy: OptimisationStrategy,
@@ -599,6 +607,7 @@ fn run() -> PumpkinResult<()> {
                 FlatZincOptions {
                     free_search: args.free_search,
                     all_solutions: args.all_solutions,
+                    circuit_propagation: args.circuit_propagation_method,
                     cumulative_options: CumulativeOptions::new(
                         args.cumulative_allow_holes,
                         args.cumulative_explanation_type,
@@ -619,6 +628,7 @@ fn run() -> PumpkinResult<()> {
                 FlatZincOptions {
                     free_search: args.free_search,
                     all_solutions: args.all_solutions,
+                    circuit_propagation: args.circuit_propagation_method,
                     cumulative_options: CumulativeOptions::new(
                         args.cumulative_allow_holes,
                         args.cumulative_explanation_type,
@@ -719,3 +729,4 @@ enum ProofType {
     /// Log the full proof with hints.
     Full,
 }
+

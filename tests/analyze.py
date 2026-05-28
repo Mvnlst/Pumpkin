@@ -278,6 +278,11 @@ if df_base is not None and df_sb is not None:
     generate_propagation_table(df_base, df_sb, TABLES_DIR + "/propagation_table.txt")
 
 
+if df_sb is not None:
+    plot_metric("sb prop / all prop", "SB Propagations / Total Propagations", "sb_ratio.png")
+
+
+
 print("\nAnalysis complete")
 
 

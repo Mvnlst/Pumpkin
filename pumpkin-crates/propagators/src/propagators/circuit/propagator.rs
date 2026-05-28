@@ -23,6 +23,7 @@ use pumpkin_core::propagation::InferenceCheckers;
 use crate::circuit::CircuitChecker;
 use crate::circuit::SCCChecker;
 use crate::circuit::StrongBridgeChecker;
+use crate::circuit::options::CircuitPropagationMethod;
 
 
 // constructor for the propagator. ConstraintTag is for proof logging
@@ -30,46 +31,55 @@ use crate::circuit::StrongBridgeChecker;
 pub struct CircuitConstructor<Var> {
     pub successors: Box<[Var]>,
     pub constraint_tag: ConstraintTag,
+    pub propagation_method: CircuitPropagationMethod,
 }
 
 // Propagator struct. Contains propagator info and inference code (latter for explanations)
 #[derive(Debug, Clone)]
 pub struct CircuitPropagator<Var> {
     pub successors: Box<[Var]>,
-    // fields (and maybe extra ones)
     inference_code: InferenceCode,
     strong_bridge_code: InferenceCode,
     scc_code: InferenceCode,
     statistics: StrongBridgeStatistics,
+    use_strong_bridges: bool, // bool indicating whether to use the extension. Can be changed to use the enum itself if more extension are added.
 }
 
-// The whole propagator constructor itself
 impl<Var> PropagatorConstructor 
     for CircuitConstructor<Var> 
 where 
-    // define the type of the variable
     Var : IntegerVariable + 'static, 
 {
-    type PropagatorImpl = CircuitPropagator<Var>; //associated type; specifies this constructor produces a CircuitConstructor when the solver instantiates it.
+    type PropagatorImpl = CircuitPropagator<Var>;
 
     fn create(
         self,
         mut context: pumpkin_core::propagation::PropagatorConstructorContext,
     ) -> Self::PropagatorImpl {
         // registering for domain events; when should our propagator be enqueued. 
-        // so go through all successors and add 'listeners' to all of them
+        // so go through all successors and add 'listeners' to all of them.
+
+        
+        let event = match self.propagation_method {
+            // base cycle prevention only needs to register for ASSIGN (as it looks only at enforced edges)
+            CircuitPropagationMethod::Base => DomainEvents::ASSIGN,
+            // Strong bridge extension needs to register for any domain change as those can trigger new strong bridges
+            CircuitPropagationMethod::StrongBridges => DomainEvents::ANY_INT,
+        };
+
+        
         self.successors
             .iter()
             .enumerate()
             .for_each(|(index, successor)| {
                 context.register(
                     successor.clone(),
-                    DomainEvents::ANY_INT,
+                    event,
                     LocalId::from(index as u32),
                 );
                 context.register_backtrack(
                     successor.clone(),
-                    DomainEvents::ANY_INT,
+                    event,
                     LocalId::from(index as u32),
                 );
             });
@@ -82,6 +92,7 @@ where
             strong_bridge_code: InferenceCode::new(self.constraint_tag, StrongBridge),
             scc_code: InferenceCode::new(self.constraint_tag, SCCCheck),
             statistics: StrongBridgeStatistics::default(),
+            use_strong_bridges: self.propagation_method == CircuitPropagationMethod::StrongBridges,
         }
     }
 
@@ -129,19 +140,26 @@ impl<Var: IntegerVariable + 'static> Propagator for CircuitPropagator<Var> {
         self.remove_self_loops(&mut context)?;
         self.check(context.domains())?;
         self.prevent(&mut context)?;
-        self.strong_bridge_prevent(&mut context)
+
+        if self.use_strong_bridges {
+             self.strong_bridge_prevent(&mut context)?;
+        }
+        Ok(())
     }
 
     fn log_statistics(&self, statistic_logger: pumpkin_core::statistics::StatisticLogger) {
-        self.statistics.log(statistic_logger.clone());
-        // TODO: this should be at a different location
+        self.statistics.log(statistic_logger);
     }
 
     fn propagate(&mut self, mut context: PropagationContext) -> PropagationStatusCP {
         self.remove_self_loops(&mut context)?;
         self.check(context.domains())?;
         self.prevent(&mut context)?;
-        self.strong_bridge_prevent_with_stats(&mut context)
+
+        if self.use_strong_bridges {
+            self.strong_bridge_prevent_with_stats(&mut context)?;
+        }
+        Ok(())
     }
 }
 
@@ -586,7 +604,7 @@ fn index_to_domain_value(index: usize) -> i32 {
 mod tests { 
     use pumpkin_core::{propagation::ReadDomains, state::State};
 
-    use crate::circuit::CircuitConstructor;
+    use crate::circuit::{CircuitConstructor, options::CircuitPropagationMethod};
 
     //VALID FULL HAMILTONIAN PATH (NO CONFLICT)
     #[test]
@@ -602,6 +620,7 @@ mod tests {
         let _ = state.add_propagator(CircuitConstructor {
             successors: vec![x, y, z].into(),
             constraint_tag,
+            propagation_method: CircuitPropagationMethod::StrongBridges,
         });
 
         let result = state.propagate_to_fixed_point();
@@ -625,6 +644,7 @@ mod tests {
         let _ = state.add_propagator(CircuitConstructor {
             successors: vec![x, y, z].into(),
             constraint_tag,
+            propagation_method: CircuitPropagationMethod::StrongBridges,
         });
 
         let result = state.propagate_to_fixed_point();
@@ -647,6 +667,7 @@ mod tests {
         let _ = state.add_propagator(CircuitConstructor {
             successors: vec![x, y, z].into(),
             constraint_tag,
+            propagation_method: CircuitPropagationMethod::StrongBridges,
         });
 
         let _ = state.propagate_to_fixed_point();
@@ -668,6 +689,7 @@ mod tests {
         let _ = state.add_propagator(CircuitConstructor {
             successors: vec![x, y, z].into(),
             constraint_tag,
+            propagation_method: CircuitPropagationMethod::StrongBridges,
         });
 
         let result = state.propagate_to_fixed_point();
@@ -687,6 +709,7 @@ mod tests {
         let _ = state.add_propagator(CircuitConstructor {
             successors: vec![x, y, z].into(),
             constraint_tag,
+            propagation_method: CircuitPropagationMethod::StrongBridges,
         });
 
         let _ = state.propagate_to_fixed_point();
@@ -708,6 +731,7 @@ mod tests {
         let _ = state.add_propagator(CircuitConstructor {
             successors: vec![x].into(),
             constraint_tag,
+            propagation_method: CircuitPropagationMethod::StrongBridges,
         });
 
         let result = state.propagate_to_fixed_point();
@@ -726,6 +750,7 @@ mod tests {
         let _ = state.add_propagator(CircuitConstructor {
             successors: vec![x, y].into(),
             constraint_tag,
+            propagation_method: CircuitPropagationMethod::StrongBridges,
         });
 
         let result = state.propagate_to_fixed_point();
@@ -748,6 +773,7 @@ mod tests {
         let _ = state.add_propagator(CircuitConstructor {
             successors: vec![x1, x2, x3, x4, x5, x6].into(),
             constraint_tag,
+            propagation_method: CircuitPropagationMethod::StrongBridges,
         });
 
         let result = state.propagate_to_fixed_point();
@@ -769,6 +795,7 @@ mod tests {
         let _ = state.add_propagator(CircuitConstructor {
             successors: vec![x1, x2, x3, x4, x5].into(),
             constraint_tag,
+            propagation_method: CircuitPropagationMethod::StrongBridges,
         });
 
         let result = state.propagate_to_fixed_point();
@@ -790,6 +817,7 @@ mod tests {
         let _ = state.add_propagator(CircuitConstructor {
             successors: vec![x1, x2, x3, x4].into(),
             constraint_tag,
+            propagation_method: CircuitPropagationMethod::StrongBridges,
         });
 
         let result = state.propagate_to_fixed_point();
@@ -814,6 +842,7 @@ mod tests {
         let _ = state.add_propagator(CircuitConstructor {
             successors: vec![x1, x2, x3, x4, x5].into(),
             constraint_tag,
+            propagation_method: CircuitPropagationMethod::StrongBridges,
         });
 
         let result = state.propagate_to_fixed_point();

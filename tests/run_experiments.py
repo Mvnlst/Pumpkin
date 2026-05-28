@@ -19,22 +19,31 @@ ALL_SEEDS = [rng.randint(0, 10**9) for _ in range(len(N_VALUES) * len(K_VALUES) 
 
 OUTPUT_DIR = f"experiment{GLOBAL_SEED}"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
-OUTPUT_FILE = f"{OUTPUT_DIR}/results_sb_seed{GLOBAL_SEED}.csv"
+
+OUTPUT_FILE_BASE = f"{OUTPUT_DIR}/results_base_seed{GLOBAL_SEED}.csv"
+OUTPUT_FILE_SB   = f"{OUTPUT_DIR}/results_sb_seed{GLOBAL_SEED}.csv"
+
 
 EXECUTABLE = os.path.join("..", "target", "release", "pumpkin-solver.exe")
 MAX_WORKERS = 8 # for parallel running of instances
 
-
-
-with open(OUTPUT_FILE, "w", newline="") as f:
-    writer = csv.writer(f)
-    writer.writerow([
-        "n", "k", "seed",
-        "nodes", "restarts", "peak depth", "solving time", "conflicts", "propagations", "average conflict size", "unit nogoods learned", "average nogood length", "average backtrack amount", "average lbd"
-    ])
-
-
 MODEL_FILE = "models/circuit_model.mzn"
+
+def init_output_file(path):
+    with open(path, "w", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow([
+            "n", "k", "seed",
+            "nodes", "restarts", "peak depth", "solving time",
+            "conflicts", "propagations",
+            "sb propagations", "sb prop / all prop",
+            "scc propagations", "scc prop / all prop",
+            "average conflict size", "unit nogoods learned",
+            "average nogood length", "average backtrack amount",
+            "average lbd"
+        ])
+
+
 
 # Generation
 def generate_instances():
@@ -57,7 +66,7 @@ def ensure_binary_exists():
 
 
 # Execution
-def run_instances(executable):
+def run_instances(executable, mode, output_file):
     tasks = []
 
     index = 0 # index keeping track of used seeds
@@ -77,7 +86,7 @@ def run_instances(executable):
     # Parellel execution
     with ProcessPoolExecutor(max_workers=MAX_WORKERS) as executor:
             futures = [
-                executor.submit(run_and_parse_instance, n, k, seed, executable)
+                executor.submit(run_and_parse_instance, n, k, seed, executable, mode)
                 for (n, k, seed) in tasks
             ]
 
@@ -102,9 +111,8 @@ def run_instances(executable):
 
 
     # Sequential writing
-    with open(OUTPUT_FILE, "a", newline="") as f:
+    with open(output_file, "a", newline="") as f:
         writer = csv.writer(f)
-
         for n, k, seed, stats in results:
             writer.writerow([
                 n, k, seed,
@@ -114,6 +122,10 @@ def run_instances(executable):
                 stats.get("solving time", 0),
                 stats.get("conflicts", 0),
                 stats.get("propagations", 0),
+                stats.get("sb propagations", 0),
+                stats.get("sb prop / all prop", 0),
+                stats.get("scc propagations", 0),
+                stats.get("scc prop / all prop", 0),
                 stats.get("average conflict size", 0),
                 stats.get("unit nogoods learned", 0),
                 stats.get("average nogood length", 0),
@@ -123,20 +135,24 @@ def run_instances(executable):
 
         print(f"Finished writing {len(results)} rows (expected {total})")
 
-    print(f"Analyze the results by running python analyze.py {OUTPUT_FILE}")
-    print(f"Compare base vs extension by running python analyze.py {OUTPUT_FILE} [base version]")
+    print(f"Compare base vs extension by running python analyze.py {OUTPUT_FILE_BASE} {OUTPUT_FILE_SB}")
 
 # Core logic
-def run_and_parse_instance(n, k, seed, executable):
+def run_and_parse_instance(n, k, seed, executable, mode):
     folder = f"experiment{GLOBAL_SEED}/instances/n{n}_k{k}/seed{seed}"
     fzn_file = os.path.join(folder, "instance.fzn")
     fzn_file = fzn_file.replace("\\", "/")
     
+    
     cmd = [
         executable,
         fzn_file,
-        "-s"
+        "-s",
+        "-v",
+        "--circuit-propagation",
+        mode   # "base" or "strong-bridges"
     ]
+
     
     try:
         result = subprocess.run(
@@ -156,6 +172,10 @@ def run_and_parse_instance(n, k, seed, executable):
             "solving time": -1, 
             "conflicts": -1, 
             "propagations": -1, 
+            "sb propagations": -1, 
+            "sb prop / all prop": -1, 
+            "scc propagations": -1, 
+            "scc prop / all prop": -1, 
             "average conflict size": -1, 
             "unit nogoods learned": -1, 
             "average nogood length": -1, 
@@ -182,6 +202,12 @@ def parse_stats(output: str):
             stats["conflicts"] = int(line.split("=")[1])
         elif "propagations" in line:
             stats["propagations"] = int(line.split("=")[1])
+        elif "NumberOfSbPropagations" in line:
+            stats["sb propagations"] = int(line.split("=")[1])
+            stats["sb prop / all prop"] = round(stats["sb propagations"] / float(stats["propagations"]), 2)
+        elif "NumberOfSccPropagations" in line:
+            stats["scc propagations"] = int(line.split("=")[1])
+            stats["scc prop / all prop"] = round(stats["scc propagations"] / float(stats["propagations"]), 2)
         elif "AverageConflictSize" in line:
             stats["average conflict size"] = float(line.split("=")[1])
         elif "NumUnit" in line:
@@ -198,5 +224,15 @@ def parse_stats(output: str):
 # main
 if __name__ == "__main__":
     ensure_binary_exists()
-    generate_instances() # generate all instances with correct folder structure
-    run_instances(EXECUTABLE) # run all instances, collect statistics and write the data to the output file
+    # Generate all instances with correct folder structure
+    generate_instances() 
+
+    # Initialize both files
+    init_output_file(OUTPUT_FILE_BASE)
+    init_output_file(OUTPUT_FILE_SB)
+
+    print("\nRunning BASE experiments...")
+    run_instances(EXECUTABLE, "base", OUTPUT_FILE_BASE)
+
+    print("\nRunning STRONG BRIDGE experiments...")
+    run_instances(EXECUTABLE, "strong-bridges", OUTPUT_FILE_SB)

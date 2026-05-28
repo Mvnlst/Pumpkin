@@ -2,22 +2,26 @@ use pumpkin_core::constraints::Constraint;
 use pumpkin_core::proof::ConstraintTag;
 use pumpkin_core::variables::IntegerVariable;
 use pumpkin_propagators::circuit::CircuitConstructor;
+use pumpkin_propagators::circuit::options::CircuitPropagationMethod;
 
 use crate::all_different;
 
 pub fn circuit<Var: IntegerVariable + 'static>(
     variables: impl Into<Box<[Var]>>,
     constraint_tag: ConstraintTag,
+    propagation_method: CircuitPropagationMethod,
 ) -> impl Constraint {
     Circuit {
         successors: variables.into(),
         constraint_tag,
+        propagation_method,
     }
 }
 
 struct Circuit<Var> {
     successors: Box<[Var]>,
     constraint_tag: ConstraintTag,
+    propagation_method: CircuitPropagationMethod,
 }
 
 impl<Var: IntegerVariable + 'static> Constraint for Circuit<Var> {
@@ -30,6 +34,7 @@ impl<Var: IntegerVariable + 'static> Constraint for Circuit<Var> {
         CircuitConstructor {
             successors: self.successors,
             constraint_tag: self.constraint_tag,
+            propagation_method: self.propagation_method,
         }
         .post(solver)
     }
@@ -45,6 +50,7 @@ impl<Var: IntegerVariable + 'static> Constraint for Circuit<Var> {
         CircuitConstructor {
             successors: self.successors,
             constraint_tag: self.constraint_tag,
+            propagation_method: self.propagation_method,
         }
         .implied_by(solver, reification_literal)
     }

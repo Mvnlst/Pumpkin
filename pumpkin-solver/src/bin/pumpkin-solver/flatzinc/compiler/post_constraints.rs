@@ -423,14 +423,14 @@ fn compile_cumulative(
 fn compile_circuit(
     context: &mut CompilationContext<'_>,
     exprs: &[flatzinc::Expr],
-    _options: &FlatZincOptions,
+    options: &FlatZincOptions,
     constraint_tag: ConstraintTag,
 ) -> Result<bool, FlatZincError> {
     check_parameters!(exprs, 1, "pumpkin_circuit");
 
     let successors = context.resolve_integer_variable_array(&exprs[0])?.to_vec();
 
-    let post_result = pumpkin_constraints::circuit(successors, constraint_tag).post(context.solver);
+    let post_result = pumpkin_constraints::circuit(successors, constraint_tag, options.circuit_propagation).post(context.solver);
     Ok(post_result.is_ok())
 }
 
