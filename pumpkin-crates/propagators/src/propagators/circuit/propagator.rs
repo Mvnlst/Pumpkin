@@ -136,6 +136,13 @@ impl<Var: IntegerVariable + 'static> Propagator for CircuitPropagator<Var> {
         self.statistics.log(statistic_logger.clone());
         // TODO: this should be at a different location
     }
+
+    fn propagate(&mut self, mut context: PropagationContext) -> PropagationStatusCP {
+        self.remove_self_loops(&mut context)?;
+        self.check(context.domains())?;
+        self.prevent(&mut context)?;
+        self.strong_bridge_prevent_with_stats(&mut context)
+    }
 }
 
 impl<Var: IntegerVariable + 'static> CircuitPropagator<Var> {
@@ -155,7 +162,6 @@ impl<Var: IntegerVariable + 'static> CircuitPropagator<Var> {
     fn strong_bridge_prevent(&self, context: &mut PropagationContext) -> PropagationStatusCP {
         // Validate graph is a single SCC
         if !self.is_strongly_connected(context) {
-            // self.statistics.number_of_scc_propagations += 1;
             return Err(Conflict::Propagator(PropagatorConflict {
                         conjunction: self.create_full_graph_explanation(context.domains()),
                         inference_code: self.scc_code.clone(),
@@ -189,8 +195,53 @@ impl<Var: IntegerVariable + 'static> CircuitPropagator<Var> {
         
         // Enforce the required_edges. Every u needs to go to v.
         for (u, v, visited) in required_edges {
-            // eprintln!("Enforce edge {} -> {} as this is a strong bridge.", u + 1, v + 1);
-            // self.statistics.number_of_sb_propagations += 1;
+            let reason = self.create_strong_bridge_explanation(context.domains(), &visited, u, v);
+            context.post(
+                predicate!(self.successors[u] == index_to_domain_value(v)),
+                reason,
+                &self.strong_bridge_code,
+            )?;
+        }
+        Ok(())
+    }
+
+    fn strong_bridge_prevent_with_stats(&mut self, context: &mut PropagationContext) -> PropagationStatusCP {
+        // Validate graph is a single SCC
+        if !self.is_strongly_connected(context) {
+            self.statistics.number_of_scc_propagations += 1;
+            return Err(Conflict::Propagator(PropagatorConflict {
+                        conjunction: self.create_full_graph_explanation(context.domains()),
+                        inference_code: self.scc_code.clone(),
+                }));
+        }
+        
+        // Detect strong bridges, which will be edges that have to be enforced. Also keep track of how far you can reach from that node.
+        let mut required_edges: Vec<(usize, usize, Vec<bool>)> = Vec::new();
+
+
+        // Loop over every node
+        for (u, node) in self.successors.iter().enumerate() {
+            let domain: Vec<i32> = context.iterate_domain(node).collect();
+
+            // If only one edge, it is already fixed
+            if domain.len() <= 1 {
+                continue;
+            }
+
+            // Check for every edge if it is a strong bridge; can u reach v without taking direct edge?
+            for v in domain {
+                let v = domain_value_to_index(v);
+                let (reachable, visited) = self.reachable_without_edge(context, u, v);
+                if !reachable {
+                    required_edges.push((u, v, visited));
+                }
+            }
+
+        }
+        
+        // Enforce the required_edges. Every u needs to go to v.
+        for (u, v, visited) in required_edges {
+            self.statistics.number_of_sb_propagations += 1;
             let reason = self.create_strong_bridge_explanation(context.domains(), &visited, u, v);
             // let reason = self.create_full_graph_explanation(context.domains());
             context.post(
@@ -202,18 +253,6 @@ impl<Var: IntegerVariable + 'static> CircuitPropagator<Var> {
         Ok(())
     }
 
-    // fn print_current_domains(&self, context: &mut PropagationContext) {
-    //     let domains = context.domains();
-    //     let mut i: i32 = 1;
-    //     for node in &self.successors {
-    //         print!("x{}: ", i);
-    //         for domain_value in domains.iterate_domain(node){
-    //             print!("{}, ", domain_value);
-    //         }
-    //         println!("");
-    //         i = i + 1;
-    //     }
-    // }
 
     fn create_strong_bridge_explanation(&self, context: Domains, visited: &[bool], u: usize, v: usize) -> PropositionalConjunction {
         // Different option: Provide Generic explanations by giving the WHOLE context as reason
@@ -253,7 +292,6 @@ impl<Var: IntegerVariable + 'static> CircuitPropagator<Var> {
         return explanation.into_iter().collect();
     }
     
-    // TODO: Rust macros
     fn reachable_without_edge(&self, context: &PropagationContext, start: usize, target: usize) -> (bool, Vec<bool>) {
 
         let n = self.successors.len();
