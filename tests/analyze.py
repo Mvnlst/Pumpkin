@@ -64,20 +64,19 @@ colors = {
 
 # Plotting function
 
-def plot_metric(metric, ylabel, filename, log_scale=False):
+def plot_metric(metric, ylabel, filename, log_scale=False, only_sb=False):
     plt.figure()
 
     # Collect all k values
     ks = sorted(set()
-        .union(group_base["k"] if group_base is not None else [])
+        .union(group_base["k"] if (group_base is not None and not only_sb) else [])
         .union(group_sb["k"] if group_sb is not None else [])
     )
 
-    # Assign colors per k
     colors = {k: plt.cm.tab10(i) for i, k in enumerate(ks)}
 
-    # Plot baseline (solid)
-    if group_base is not None:
+    # Plot baseline ONLY if not SB-only
+    if group_base is not None and not only_sb:
         for k in group_base["k"].unique():
             subset = group_base[group_base["k"] == k]
             plt.plot(
@@ -88,52 +87,50 @@ def plot_metric(metric, ylabel, filename, log_scale=False):
                 color=colors[k]
             )
 
-    # Plot strong bridge (dashed)
+    # Always plot SB if available
     if group_sb is not None:
         for k in group_sb["k"].unique():
             subset = group_sb[group_sb["k"] == k]
             plt.plot(
                 subset["n"],
                 subset[metric],
-                linestyle='--',
-                marker='x',
+                linestyle='--' if not only_sb else '-',   # cleaner look
+                marker='x' if not only_sb else 'o',
                 color=colors[k]
             )
 
-    # Legend for k (colors)
+    # Legend for k
     color_legend = [
         Line2D([0], [0], color=colors[k], lw=2, label=f"k = {k}")
         for k in ks
     ]
 
-    # Legend for methods (line styles)
-    style_legend = []
-
-    if group_base is not None:
-        style_legend.append(
-            Line2D([0], [0], color='black', lw=2, linestyle='-', label='Baseline')
-        )
-
-    if group_sb is not None:
-        style_legend.append(
-            Line2D([0], [0], color='black', lw=2, linestyle='--', label='Strong bridge')
-        )
-
-    # Add both legends
-    first_legend = plt.legend(handles=color_legend, title="variable k", loc="upper left")
+    first_legend = plt.legend(handles=color_legend, title="k", loc="upper left")
     plt.gca().add_artist(first_legend)
+
+    # Legend for method ONLY if both shown
+    if not only_sb:
+        style_legend = []
+        if group_base is not None:
+            style_legend.append(
+                Line2D([0], [0], color='black', lw=2, linestyle='-', label='Baseline')
+            )
+        if group_sb is not None:
+            style_legend.append(
+                Line2D([0], [0], color='black', lw=2, linestyle='--', label='Strong bridge')
+            )
+        plt.legend(handles=style_legend, title="Method", loc="upper right")
 
     if log_scale:
         plt.yscale("log")
-    plt.legend(handles=style_legend, title="Method", loc="upper right")
 
     plt.xlabel("n (number of nodes)")
     plt.ylabel(ylabel)
     plt.title(f"{ylabel} vs n")
     plt.grid(True)
 
-    plt.savefig(os.path.join(PLOTS_DIR, filename))
-    plt.close()
+    plt.tight_layout()
+    plt.savefig(os.path.join(PLOTS_DIR, filename), bbox_inches='tight')
 
 
 def generate_latex_table(df_base, df_sb, output_file="table.txt"):
@@ -279,7 +276,12 @@ if df_base is not None and df_sb is not None:
 
 
 if df_sb is not None:
-    plot_metric("sb prop / all prop", "SB Propagations / Total Propagations", "sb_ratio.png")
+    
+    plot_metric("sb prop / all prop", "SB Propagations / Total Propagations", "sb_ratio.png", only_sb=True)
+    plot_metric("scc prop / all prop", "SCC Propagations / Total Propagations", "scc_ratio.png", only_sb=True)
+    plot_metric("sb propagations", "Number of Strong Bridge Propagations", "sb.png", only_sb=True)
+    plot_metric("scc propagations", "Number of SCC Propagations", "scc.png", only_sb=True)
+
 
 
 
