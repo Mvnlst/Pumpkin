@@ -22,16 +22,19 @@ file2 = sys.argv[2] if len(sys.argv) > 2 else None
 df_base = None
 df_sb = None
 
+def remove_timeouts(df):
+    return df[df["solving time"] != -1]
+
 if "sb" in file1:
-    df_sb = pd.read_csv(file1)
+    df_sb = remove_timeouts(pd.read_csv(file1))
 else:
-    df_base = pd.read_csv(file1)
+    df_base = remove_timeouts(pd.read_csv(file1))
 
 if file2:
     if "sb" in file2:
-        df_sb = pd.read_csv(file2)
+        df_sb = remove_timeouts(pd.read_csv(file2))
     else:
-        df_base = pd.read_csv(file2)
+        df_base = remove_timeouts(pd.read_csv(file2))
 
 OUTPUT_DIR = file1.split('/')[0] + "/analysis"
 PLOTS_DIR = OUTPUT_DIR + "/plots"
@@ -263,11 +266,13 @@ def format_sci(x):
 
 
 
+
+
 # Generate plots
 
 plot_metric("conflicts", "Average Conflicts", "conflicts.png", True)
 plot_metric("propagations", "Average Propagations", "propagations.png", True)
-plot_metric("solving time", "Average Runtime (s)", "runtime.png")
+plot_metric("solving time", "Average Runtime (s)", "runtime.png", True)
 plot_metric("average lbd", "Average LBD", "lbd.png")
 
 if df_base is not None and df_sb is not None:
@@ -279,8 +284,8 @@ if df_sb is not None:
     
     plot_metric("sb prop / all prop", "SB Propagations / Total Propagations", "sb_ratio.png", only_sb=True)
     plot_metric("scc prop / all prop", "SCC Propagations / Total Propagations", "scc_ratio.png", only_sb=True)
-    plot_metric("sb propagations", "Number of Strong Bridge Propagations", "sb.png", only_sb=True)
-    plot_metric("scc propagations", "Number of SCC Propagations", "scc.png", only_sb=True)
+    plot_metric("sb propagations", "Number of Strong Bridge Propagations", "sb.png", only_sb=True, log_scale=True)
+    plot_metric("scc propagations", "Number of SCC Propagations", "scc.png", only_sb=True, log_scale=True)
 
 
 
