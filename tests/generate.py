@@ -3,7 +3,7 @@ from minizinc_io import write_dzn, compile_fzn, create_manual_instance_folder, c
 import random
 import sys
 
-def generate_and_save(n, k, seed=None, model_file="models/circuit_model.mzn", solver="pumpkin-strong-bridge", experiment_seed=None):
+def generate_and_save(n, k, seed=None, model_file="models/circuit_model_minimize.mzn", solver="pumpkin-strong-bridge", experiment_seed=None):
     
 
     if experiment_seed is None:
@@ -13,10 +13,10 @@ def generate_and_save(n, k, seed=None, model_file="models/circuit_model.mzn", so
         folder = create_manual_instance_folder(n, k, seed)
 
         # Generate graph
-        edges, order = generate_instance(n, k, seed)
+        edges, dist, order = generate_instance(n, k, seed)
 
         # Write instance
-        dzn_file = write_dzn(edges, n, k, seed, folder)
+        dzn_file = write_dzn(edges, dist, n, k, seed, folder)
 
         # Compile to FlatZinc
         fzn_file = compile_fzn(model_file, dzn_file, folder, solver, True)
@@ -29,10 +29,10 @@ def generate_and_save(n, k, seed=None, model_file="models/circuit_model.mzn", so
         folder = create_experiment_instance_folder(experiment_seed, n, k, seed)
 
         # Generate graph
-        edges, order = generate_instance(n, k, seed)
+        edges, dist, order = generate_instance(n, k, seed)
 
         # Write instance
-        dzn_file = write_dzn(edges, n, k, seed, folder)
+        dzn_file = write_dzn(edges, dist, n, k, seed, folder)
 
         # Compile to FlatZinc
         fzn_file = compile_fzn(model_file, dzn_file, folder, solver)

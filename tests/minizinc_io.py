@@ -13,34 +13,47 @@ def create_experiment_instance_folder(experiment_seed, instance_n, instance_k, i
     os.makedirs(folder, exist_ok=True)
     return folder
 
-# Write the dzn file to the correct location
-def write_dzn(edges, n, k, seed, folder):
+
+def write_dzn(edges, dist, n, k, seed, folder):
     filename = f"{folder}/instance.dzn"
 
     with open(filename, "w") as f:
-        # info about the problem
+        # metadata
         f.write(f"% n = {n}\n") 
         f.write(f"% k = {k}\n")
         f.write(f"% seed = {seed}\n")
         f.write("\n")
 
-        # actual problem instance
-        f.write(f"n = {n};\n")
+        # parameters
+        f.write(f"n = {n};\n\n")
 
+        # allowed sets
         f.write("allowed = [\n")
         for i in range(n):
             row = sorted(edges[i])
-            # Convert to 1-based indexing
-            row_str = ", ".join(str(j+1) for j in row)
+            row_str = ", ".join(str(j + 1) for j in row)  # 1-based indexing
 
             f.write(f"    {{{row_str}}}")
             if i < n - 1:
                 f.write(",\n")
             else:
                 f.write("\n")
-        f.write("];\n")
+        f.write("];\n\n")
+
+        # distance matrix
+        f.write("dist = array2d(1..n, 1..n, [\n")
+
+        flat = []
+        for i in range(n):
+            for j in range(n):
+                flat.append(str(dist[i][j]))
+
+        f.write("    " + ", ".join(flat) + "\n")
+        f.write("]);\n")
 
     return filename
+
+
 
 # Compile the fzn file and put it in the right location with the -o flag
 # Prevent ozn file from generating

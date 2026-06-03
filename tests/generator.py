@@ -16,20 +16,24 @@ def generate_instance(n, k, seed=None):
         y = rng.random()
         positions[i] = (x, y)
 
-    # Compute distances
-    def distance(i, j):
-        return math.dist(positions[i], positions[j])
+    # precompute full distance matrix
+    dist = [[0 for _ in range(n)] for _ in range(n)]
+    for i in range(n):
+        for j in range(n):
+            if i != j:
+                d = math.dist(positions[i], positions[j])
+                # Scale to integer (MiniZinc prefers ints)
+                dist[i][j] = int(d * 1000)
+            else:
+                dist[i][j] = 0
 
     # Build edges
     edges = {}
     for i in range(n):
         edges[i] = set()
-
-        # Compute all distances to other nodes
-        distances = []
-        for j in range(n):
-            if i != j:
-                distances.append((j, distance(i, j)))
+        
+        # Gather all distances from precomputed matrix
+        distances = [(j, dist[i][j]) for j in range(n) if i != j]
 
         # Sort by distance
         distances.sort(key=lambda x: x[1])
@@ -70,4 +74,4 @@ def generate_instance(n, k, seed=None):
     # Close the cycle by adding an edge from last node to the starting one
     edges[current].add(order[0])
 
-    return edges, order
+    return edges, dist, order

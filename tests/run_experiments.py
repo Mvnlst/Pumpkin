@@ -8,8 +8,8 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 
 N_VALUES = [20, 40, 60, 80, 100] # which different n's we explore
 K_VALUES = [2, 4, 7, 10] # which different k's we explore
-INSTANCE_AMOUNT = 200 # how many times we generate an instance for each (n, k) combination to average over afterwards
-TIMEOUT = 15 * 60 # 15 minutes
+INSTANCE_AMOUNT = 50 # how many times we generate an instance for each (n, k) combination to average over afterwards
+TIMEOUT = 30 * 60 # timeout in seconds
 
 if len(sys.argv) < 2:
     raise ValueError("Usage: python run_experiments.py <seed>")
@@ -27,7 +27,7 @@ OUTPUT_FILE_SB   = f"{OUTPUT_DIR}/results_sb_seed{GLOBAL_SEED}.csv"
 EXECUTABLE = os.path.join("..", "target", "release", "pumpkin-solver.exe")
 MAX_WORKERS = 8 # for parallel running of instances
 
-MODEL_FILE = "models/circuit_model.mzn"
+MODEL_FILE = "models/circuit_model_minimize.mzn"
 
 def init_output_file(path):
     with open(path, "w", newline="") as f:
@@ -189,7 +189,21 @@ def run_and_parse_instance(n, k, seed, executable, mode):
 
 def parse_stats(output: str):
     stats = {}
-    for line in output.splitlines():
+
+    # split into stat blocks
+    blocks = output.split("%%%mzn-stat-end")
+
+    # take last non-empty block
+    stat_block = None
+    for block in reversed(blocks):
+        if "%%%mzn-stat:" in block:
+            stat_block = block
+            break
+    
+    if stat_block is None:
+            return stats  # no stats found
+
+    for line in stat_block.splitlines():
         if "nodes" in line:
             stats["nodes"] = int(line.split("=")[1])
         elif "restarts" in line:

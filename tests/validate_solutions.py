@@ -1,8 +1,8 @@
 import subprocess
 import os
 
-MODEL_SB = "models/circuit_model.mzn"
-MODEL_REF = "models/circuit_model_decomposed.mzn"
+MODEL_SB = "models/circuit_model_satisfy.mzn"
+MODEL_REF = "models/circuit_model_satisfy_decomposed.mzn"
 SOLVER_SB = "pumpkin-strong-bridge"
 SOLVER_REF = "gecode"
 INSTANCE_DIR = "instances_for_validation"
