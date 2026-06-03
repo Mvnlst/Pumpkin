@@ -6,8 +6,8 @@ import csv
 import os
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
-N_VALUES = [20, 40, 60, 80, 100] # which different n's we explore
-K_VALUES = [2, 4, 7, 10] # which different k's we explore
+N_VALUES = [20, 40, 60] # which different n's we explore
+K_VALUES = [2, 3, 4] # which different k's we explore
 INSTANCE_AMOUNT = 50 # how many times we generate an instance for each (n, k) combination to average over afterwards
 TIMEOUT = 30 * 60 # timeout in seconds
 
@@ -25,7 +25,7 @@ OUTPUT_FILE_SB   = f"{OUTPUT_DIR}/results_sb_seed{GLOBAL_SEED}.csv"
 
 
 EXECUTABLE = os.path.join("..", "target", "release", "pumpkin-solver.exe")
-MAX_WORKERS = 8 # for parallel running of instances
+MAX_WORKERS = 10 # for parallel running of instances
 
 MODEL_FILE = "models/circuit_model_minimize.mzn"
 
@@ -55,6 +55,13 @@ def generate_instances():
             index += INSTANCE_AMOUNT
 
             for seed in seeds_for_pair:
+                folder = f"experiment{GLOBAL_SEED}/instances/n{n}_k{k}/seed{seed}"
+                fzn_file = os.path.join(folder, "instance.fzn")
+
+                # only build instance if it is not here yet
+                if os.path.exists(fzn_file):
+                    continue
+
                 generate_and_save(n, k, seed, model_file=MODEL_FILE, experiment_seed=GLOBAL_SEED)
 
 def ensure_binary_exists():
@@ -65,22 +72,46 @@ def ensure_binary_exists():
     )
 
 
+# check which instances are already run and written to csv
+def load_completed(output_file):
+    completed = set()
+
+    # csv file does not exist yet
+    if not os.path.exists(output_file):
+        return completed
+
+    with open(output_file, "r") as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            key = (int(row["n"]), int(row["k"]), int(row["seed"]))
+            completed.add(key)
+
+    return completed
+
+
+
 # Execution
 def run_instances(executable, mode, output_file):
-    tasks = []
+    completed_set = load_completed(output_file)
 
+    tasks = []
     index = 0 # index keeping track of used seeds
+
     for n in N_VALUES:
         for k in K_VALUES:
             seeds_for_pair = ALL_SEEDS[index:index+INSTANCE_AMOUNT]
             index += INSTANCE_AMOUNT
 
             for seed in seeds_for_pair:
+                key = (n, k, seed)
+                if key in completed_set:
+                    continue # we already have the stats of this instance
+
                 tasks.append((n, k, seed))
     
-    print(f"Running {len(tasks)} instances in parellel...")
+    total = len(N_VALUES) * len(K_VALUES) * INSTANCE_AMOUNT
+    print(f"Running {len(tasks)} instances in parellel, as we already have {total - len(tasks)} written in csv")
     completed = 0
-    total = len(tasks)
     results = []
 
     # Parellel execution
@@ -101,41 +132,40 @@ def run_instances(executable, mode, output_file):
                     print("Warning: got None result")
                     continue
 
-                results.append(result)
-
                 n, k, seed, stats = result
+                write_to_output(n, k, seed, stats, output_file)
 
                 completed += 1
-                print(f"{completed}/{total} done (n={n}, k={k})")
+                print(f"{completed}/{total} done (n={n}, k={k}). Solving time: {stats.get('solving time', -1)}")
+            
+            print(f"Compare base vs extension by running python analyze.py {OUTPUT_FILE_BASE} {OUTPUT_FILE_SB}")
 
 
 
+    
+
+def write_to_output(n, k, seed, stats, output_file):
     # Sequential writing
     with open(output_file, "a", newline="") as f:
         writer = csv.writer(f)
-        for n, k, seed, stats in results:
-            writer.writerow([
-                n, k, seed,
-                stats.get("nodes", 0),
-                stats.get("restarts", 0),
-                stats.get("peak depth", 0),
-                stats.get("solving time", 0),
-                stats.get("conflicts", 0),
-                stats.get("propagations", 0),
-                stats.get("sb propagations", 0),
-                stats.get("sb prop / all prop", 0),
-                stats.get("scc propagations", 0),
-                stats.get("scc prop / all prop", 0),
-                stats.get("average conflict size", 0),
-                stats.get("unit nogoods learned", 0),
-                stats.get("average nogood length", 0),
-                stats.get("average backtrack amount", 0),
-                stats.get("average lbd", 0),
-            ])
-
-        print(f"Finished writing {len(results)} rows (expected {total})")
-
-    print(f"Compare base vs extension by running python analyze.py {OUTPUT_FILE_BASE} {OUTPUT_FILE_SB}")
+        writer.writerow([
+            n, k, seed,
+            stats.get("nodes", 0),
+            stats.get("restarts", 0),
+            stats.get("peak depth", 0),
+            stats.get("solving time", 0),
+            stats.get("conflicts", 0),
+            stats.get("propagations", 0),
+            stats.get("sb propagations", 0),
+            stats.get("sb prop / all prop", 0),
+            stats.get("scc propagations", 0),
+            stats.get("scc prop / all prop", 0),
+            stats.get("average conflict size", 0),
+            stats.get("unit nogoods learned", 0),
+            stats.get("average nogood length", 0),
+            stats.get("average backtrack amount", 0),
+            stats.get("average lbd", 0),
+        ])
 
 # Core logic
 def run_and_parse_instance(n, k, seed, executable, mode):
@@ -242,8 +272,11 @@ if __name__ == "__main__":
     generate_instances() 
 
     # Initialize both files
-    init_output_file(OUTPUT_FILE_BASE)
-    init_output_file(OUTPUT_FILE_SB)
+    if not os.path.exists(OUTPUT_FILE_BASE):
+        init_output_file(OUTPUT_FILE_BASE)
+    
+    if not os.path.exists(OUTPUT_FILE_SB):
+        init_output_file(OUTPUT_FILE_SB)
 
     print("\nRunning BASE experiments...")
     run_instances(EXECUTABLE, "base", OUTPUT_FILE_BASE)
