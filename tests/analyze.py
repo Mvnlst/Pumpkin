@@ -264,6 +264,62 @@ def generate_propagation_table(df_base, df_sb, output_file="table_prop.txt"):
     print(f"Propagation table written to {output_file}")
 
 
+def generate_runtime_table(df_base, df_sb, output_file="runtime_table.txt"):
+
+    merged = df_base.merge(
+        df_sb,
+        on=["n", "k", "seed"],
+        suffixes=("_base", "_sb")
+    )
+
+    grouped = merged.groupby(["n", "k"]).mean().reset_index()
+
+    grouped["time_diff"] = grouped["solving time_base"] - grouped["solving time_sb"]
+
+    grouped["time_reduction"] = (
+        grouped["time_diff"] /
+        grouped["solving time_base"].replace(0, 1)
+    ) * 100
+
+    lines = []
+
+    lines.append("\\begin{table}[h]")
+    lines.append("\\centering")
+    lines.append("\\begin{tabular}{cc|ccc|c}")
+    lines.append("\\hline")
+    lines.append("n & k & Time (base) & Time (SB) & $\\Delta$ Time & Reduction (\\%) \\\\")
+    lines.append("\\hline")
+
+    for _, row in grouped.iterrows():
+        n = int(row["n"])
+        k = int(row["k"])
+
+        
+        base_time = format_time(row["solving time_base"])
+        sb_time = format_time(row["solving time_sb"])
+        delta_time = format_time(row["time_diff"])
+        reduction = round(row["time_reduction"], 1)
+
+        if base_time == 0:
+            reduction_str = "--"
+        else:
+            reduction_str = f"{reduction}"
+
+        lines.append(
+            f"{n} & {k} & {base_time} & {sb_time} & {delta_time} & {reduction_str} \\\\"
+        )
+
+    lines.append("\\hline")
+    lines.append("\\end{tabular}")
+    lines.append("\\caption{Runtime comparison between baseline and strong bridge propagation.}")
+    lines.append("\\end{table}")
+
+    with open(output_file, "w") as f:
+        f.write("\n".join(lines))
+
+    print(f"Runtime table written to {output_file}")
+
+
 def format_sci(x):
     if x == 0:
         return "0"
@@ -276,6 +332,14 @@ def format_sci(x):
     return f"{base:.2f} \\times 10^{exponent}"
 
 
+def format_time(x):
+    if x < 0.001:
+        return f"{x:.2e}"        # scientific for very small
+    elif x < 1:
+        return f"{x:.4f}"        # more precision
+    else:
+        return f"{x:.2f}"        # normal
+
 
 
 
@@ -284,12 +348,14 @@ def format_sci(x):
 
 plot_metric("conflicts", "Average Conflicts", "conflicts.pdf", True)
 plot_metric("propagations", "Average Propagations", "propagations.pdf", True)
-plot_metric("solving time", "Average Runtime (s)", "runtime.pdf", True)
+plot_metric("solving time", "Average Runtime (s)", "runtime_log.pdf", True)
+plot_metric("solving time", "Average Runtime (s)", "runtime.pdf")
 plot_metric("average lbd", "Average LBD", "lbd.pdf")
 
 if df_base is not None and df_sb is not None:
     generate_latex_table(df_base, df_sb, TABLES_DIR + "/conflicts_table.txt")
     generate_propagation_table(df_base, df_sb, TABLES_DIR + "/propagation_table.txt")
+    generate_runtime_table(df_base, df_sb, TABLES_DIR + "/runtime_table.txt")
 
 
 if df_sb is not None:

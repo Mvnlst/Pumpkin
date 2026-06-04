@@ -6,10 +6,11 @@ import csv
 import os
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
-N_VALUES = [20, 40, 60] # which different n's we explore
-K_VALUES = [2, 3, 4] # which different k's we explore
-INSTANCE_AMOUNT = 50 # how many times we generate an instance for each (n, k) combination to average over afterwards
-TIMEOUT = 60 * 60 # timeout in seconds
+N_VALUES = [20, 40, 60, 80, 100] # which different n's we explore
+K_VALUES = [2, 4, 7, 10] # which different k's we explore
+INSTANCE_AMOUNT = 200 # how many times we generate an instance for each (n, k) combination to average over afterwards
+TIMEOUT = 15 * 60 # timeout in seconds
+
 
 if len(sys.argv) < 2:
     raise ValueError("Usage: python run_experiments.py <seed>")
@@ -27,7 +28,8 @@ OUTPUT_FILE_SB   = f"{OUTPUT_DIR}/results_sb_seed{GLOBAL_SEED}.csv"
 EXECUTABLE = os.path.join("..", "target", "release", "pumpkin-solver.exe")
 MAX_WORKERS = 10 # for parallel running of instances
 
-MODEL_FILE = "models/circuit_model_minimize.mzn"
+
+MODEL_FILE = "models/circuit_model_satisfy.mzn" # circuit_model_satisfy.mzn for satisfy, circuit_model_minimize.mzn for optimization problem
 
 def init_output_file(path):
     with open(path, "w", newline="") as f:
