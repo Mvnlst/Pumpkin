@@ -9,7 +9,7 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 N_VALUES = [20, 40, 60] # which different n's we explore
 K_VALUES = [2, 3, 4] # which different k's we explore
 INSTANCE_AMOUNT = 50 # how many times we generate an instance for each (n, k) combination to average over afterwards
-TIMEOUT = 30 * 60 # timeout in seconds
+TIMEOUT = 60 * 60 # timeout in seconds
 
 if len(sys.argv) < 2:
     raise ValueError("Usage: python run_experiments.py <seed>")

@@ -70,6 +70,15 @@ colors = {
 def plot_metric(metric, ylabel, filename, log_scale=False, only_sb=False):
     plt.figure()
 
+    plt.rcParams.update({
+        "font.size": 12,          # general font
+        "axes.titlesize": 16,     # title
+        "axes.labelsize": 14,     # axis labels
+        "legend.fontsize": 12,
+        "xtick.labelsize": 14,
+        "ytick.labelsize": 14
+    })
+
     # Collect all k values
     ks = sorted(set()
         .union(group_base["k"] if (group_base is not None and not only_sb) else [])
@@ -131,6 +140,9 @@ def plot_metric(metric, ylabel, filename, log_scale=False, only_sb=False):
     plt.ylabel(ylabel)
     plt.title(f"{ylabel} vs n")
     plt.grid(True)
+    
+    
+
 
     plt.tight_layout()
     plt.savefig(os.path.join(PLOTS_DIR, filename), bbox_inches='tight')
@@ -270,10 +282,10 @@ def format_sci(x):
 
 # Generate plots
 
-plot_metric("conflicts", "Average Conflicts", "conflicts.png", True)
-plot_metric("propagations", "Average Propagations", "propagations.png", True)
-plot_metric("solving time", "Average Runtime (s)", "runtime.png", True)
-plot_metric("average lbd", "Average LBD", "lbd.png")
+plot_metric("conflicts", "Average Conflicts", "conflicts.pdf", True)
+plot_metric("propagations", "Average Propagations", "propagations.pdf", True)
+plot_metric("solving time", "Average Runtime (s)", "runtime.pdf", True)
+plot_metric("average lbd", "Average LBD", "lbd.pdf")
 
 if df_base is not None and df_sb is not None:
     generate_latex_table(df_base, df_sb, TABLES_DIR + "/conflicts_table.txt")
@@ -282,10 +294,10 @@ if df_base is not None and df_sb is not None:
 
 if df_sb is not None:
     
-    plot_metric("sb prop / all prop", "SB Propagations / Total Propagations", "sb_ratio.png", only_sb=True)
-    plot_metric("scc prop / all prop", "SCC Propagations / Total Propagations", "scc_ratio.png", only_sb=True)
-    plot_metric("sb propagations", "Number of Strong Bridge Propagations", "sb.png", only_sb=True, log_scale=True)
-    plot_metric("scc propagations", "Number of SCC Propagations", "scc.png", only_sb=True, log_scale=True)
+    plot_metric("sb prop / all prop", "SB Propagations / Total Propagations", "sb_ratio.pdf", only_sb=True)
+    plot_metric("scc prop / all prop", "SCC Propagations / Total Propagations", "scc_ratio.pdf", only_sb=True)
+    plot_metric("sb propagations", "Number of Strong Bridge Propagations", "sb.pdf", only_sb=True, log_scale=True)
+    plot_metric("scc propagations", "Number of SCC Propagations", "scc.pdf", only_sb=True, log_scale=True)
 
 
 

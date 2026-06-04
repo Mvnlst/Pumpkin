@@ -12,7 +12,7 @@ n & k & Prop (base) & Prop (SB) & $\Delta$ Prop & Reduction (\%) \\
 40 & 4 & $3.71 \times 10^8$ & $5.73 \times 10^7$ & $3.13 \times 10^8$ & 84.5 \\
 60 & 2 & $2.91 \times 10^6$ & $8.16 \times 10^3$ & $2.90 \times 10^6$ & 99.7 \\
 60 & 3 & $5.85 \times 10^7$ & $4.78 \times 10^6$ & $5.38 \times 10^7$ & 91.8 \\
-60 & 4 & $1.85 \times 10^9$ & $5.00 \times 10^8$ & $1.35 \times 10^9$ & 72.9 \\
+60 & 4 & $2.74 \times 10^9$ & $6.06 \times 10^8$ & $2.13 \times 10^9$ & 77.9 \\
 \hline
 \end{tabular}
 \caption{Reduction in propagations using strong bridges}
