@@ -4,6 +4,7 @@ import sys
 import subprocess
 import csv
 import os
+import datetime
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
 if len(sys.argv) < 2:
@@ -70,7 +71,7 @@ def init_output_file(path):
             "scc propagations", "scc prop / all prop",
             "average conflict size", "unit nogoods learned",
             "average nogood length", "average backtrack amount",
-            "average lbd"
+            "average lbd", "base time", "sb time", "scc time"
         ])
 
 
@@ -173,7 +174,7 @@ def run_instances(executable, mode, output_file):
                 write_to_output(n, k, seed, stats, output_file)
 
                 completed += 1
-                print(f"{completed}/{total} done (n={n}, k={k}). Solving time: {stats.get('solving time', -1)}")
+                print(f"{completed + (total - len(tasks))}/{total} done (n={n}, k={k}). Solving time: {stats.get('solving time', -1)}. Timestamp: {datetime.datetime.now().strftime('%H:%M:%S')}")
 
 
 
@@ -200,6 +201,9 @@ def write_to_output(n, k, seed, stats, output_file):
             stats.get("average nogood length", 0),
             stats.get("average backtrack amount", 0),
             stats.get("average lbd", 0),
+            stats.get("base time", 0),
+            stats.get("sb time", 0),
+            stats.get("scc time", 0),
         ])
 
 # Core logic
@@ -245,7 +249,10 @@ def run_and_parse_instance(n, k, seed, executable, mode, timeout, solve_type):
             "unit nogoods learned": -1, 
             "average nogood length": -1, 
             "average backtrack amount": -1, 
-            "average lbd": -1
+            "average lbd": -1,
+            "base time": -1,
+            "scc time": -1,
+            "sb time": -1,
         }
     
     
@@ -297,6 +304,12 @@ def parse_stats(output: str):
             stats["average backtrack amount"] = float(line.split("=")[1])
         elif "AverageLbd" in line:
             stats["average lbd"] = float(line.split("=")[1])
+        elif "BaselineCyclePreventionTime" in line:
+            stats["base time"] = float(line.split("=")[1]) * 10 ** -9
+        elif "SbPropagationsTime" in line:
+            stats["sb time"] = float(line.split("=")[1]) * 10 ** -9
+        elif "SccPropagationsTime" in line:
+            stats["scc time"] = float(line.split("=")[1]) * 10 ** -9
     
     return stats
 
@@ -306,18 +319,18 @@ if __name__ == "__main__":
 
     run_experiment(
         solve_type="sat",
-        n_values=[10, 20],
-        k_values=[2, 3, 4],
-        instance_amount=20,
+        n_values=[20, 40, 60, 80, 100],
+        k_values=[2, 4, 7, 10],
+        instance_amount=200,
         model_file="../models/circuit_model_satisfy.mzn",
         timeout=15 * 60
     )
 
     run_experiment(
         solve_type="opt",
-        n_values=[15, 20],
-        k_values=[2, 3],
-        instance_amount=10,
+        n_values=[20, 40, 60],
+        k_values=[2, 3, 4],
+        instance_amount=50,
         model_file="../models/circuit_model_minimize.mzn",
         timeout=60 * 60
     )

@@ -1,3 +1,5 @@
+use std::time::Instant;
+
 use fixedbitset::FixedBitSet;
 use pumpkin_core::conjunction;
 use pumpkin_core::create_statistics_struct;
@@ -126,6 +128,9 @@ declare_inference_label!(SCCCheck);
  create_statistics_struct!(StrongBridgeStatistics {
             number_of_sb_propagations: usize,
             number_of_scc_propagations: usize,
+            sb_propagations_time: u64,
+            scc_propagations_time: u64,
+            baseline_cycle_prevention_time: u64,
         });
 
 
@@ -153,8 +158,10 @@ impl<Var: IntegerVariable + 'static> Propagator for CircuitPropagator<Var> {
 
     fn propagate(&mut self, mut context: PropagationContext) -> PropagationStatusCP {
         self.remove_self_loops(&mut context)?;
+        let start = Instant::now();
         self.check(context.domains())?;
         self.prevent(&mut context)?;
+        self.statistics.baseline_cycle_prevention_time += start.elapsed().as_nanos() as u64;
 
         if self.use_strong_bridges {
             self.strong_bridge_prevent_with_stats(&mut context)?;
@@ -225,14 +232,20 @@ impl<Var: IntegerVariable + 'static> CircuitPropagator<Var> {
 
     fn strong_bridge_prevent_with_stats(&mut self, context: &mut PropagationContext) -> PropagationStatusCP {
         // Validate graph is a single SCC
+        let scc_start = Instant::now();
         if !self.is_strongly_connected(context) {
             self.statistics.number_of_scc_propagations += 1;
+            self.statistics.scc_propagations_time += scc_start.elapsed().as_nanos() as u64;
+
             return Err(Conflict::Propagator(PropagatorConflict {
                         conjunction: self.create_full_graph_explanation(context.domains()),
                         inference_code: self.scc_code.clone(),
                 }));
+        } else {
+            self.statistics.scc_propagations_time += scc_start.elapsed().as_nanos() as u64;
         }
         
+        let sb_start = Instant::now();
         // Detect strong bridges, which will be edges that have to be enforced. Also keep track of how far you can reach from that node.
         let mut required_edges: Vec<(usize, usize, Vec<bool>)> = Vec::new();
 
@@ -268,6 +281,7 @@ impl<Var: IntegerVariable + 'static> CircuitPropagator<Var> {
                 &self.strong_bridge_code,
             )?;
         }
+        self.statistics.sb_propagations_time += sb_start.elapsed().as_nanos() as u64;
         Ok(())
     }
 
