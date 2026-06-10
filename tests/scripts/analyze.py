@@ -36,7 +36,8 @@ if file2:
     else:
         df_base = remove_timeouts(pd.read_csv(file2))
 
-OUTPUT_DIR = file1.split('/')[0] + "/analysis"
+
+OUTPUT_DIR = os.path.dirname(file1) + "/analysis"
 PLOTS_DIR = OUTPUT_DIR + "/plots"
 TABLES_DIR = OUTPUT_DIR + "/tables"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
@@ -206,7 +207,6 @@ def generate_latex_table(df_base, df_sb, output_file="table.txt"):
     with open(output_file, "w") as f:
         f.write("\n".join(lines))
 
-    print(f"LaTeX table written to {output_file}")
 
 
 def generate_propagation_table(df_base, df_sb, output_file="table_prop.txt"):
@@ -261,7 +261,6 @@ def generate_propagation_table(df_base, df_sb, output_file="table_prop.txt"):
     with open(output_file, "w") as f:
         f.write("\n".join(lines))
 
-    print(f"Propagation table written to {output_file}")
 
 
 def generate_runtime_table(df_base, df_sb, output_file="runtime_table.txt"):
@@ -317,7 +316,6 @@ def generate_runtime_table(df_base, df_sb, output_file="runtime_table.txt"):
     with open(output_file, "w") as f:
         f.write("\n".join(lines))
 
-    print(f"Runtime table written to {output_file}")
 
 
 def format_sci(x):

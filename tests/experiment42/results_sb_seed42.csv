@@ -1,1 +1,0 @@
-n,k,seed,nodes,restarts,peak depth,solving time,conflicts,propagations,sb propagations,sb prop / all prop,scc propagations,scc prop / all prop,average conflict size,unit nogoods learned,average nogood length,average backtrack amount,average lbd

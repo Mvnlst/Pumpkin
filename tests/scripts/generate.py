@@ -3,7 +3,7 @@ from minizinc_io import write_dzn, compile_fzn, create_manual_instance_folder, c
 import random
 import sys
 
-def generate_and_save(n, k, seed=None, model_file="models/circuit_model_minimize.mzn", solver="pumpkin-strong-bridge", experiment_seed=None):
+def generate_and_save(n, k, seed=None, model_file="../models/circuit_model_minimize.mzn", solver="pumpkin-strong-bridge", experiment_seed=None, solve_type=None):
     
 
     if experiment_seed is None:
@@ -23,10 +23,10 @@ def generate_and_save(n, k, seed=None, model_file="models/circuit_model_minimize
 
         return folder, dzn_file, fzn_file
     else:
-        if seed is None:
-            raise Exception("Every instance in experiments should have a seed")
+        if seed is None or solve_type is None:
+            raise Exception("Every instance in experiments should have a seed or solve type")
         # Create folder
-        folder = create_experiment_instance_folder(experiment_seed, n, k, seed)
+        folder = create_experiment_instance_folder(experiment_seed, n, k, seed, solve_type)
 
         # Generate graph
         edges, dist, order = generate_instance(n, k, seed)

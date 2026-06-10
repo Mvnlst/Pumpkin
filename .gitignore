@@ -3,4 +3,5 @@ target/
 .idea/
 __pycache__/
 *.pyc
-tests/experiment*/instances/
+tests/experiments/experiment*/sat/instances
+tests/experiments/experiment*/opt/instances

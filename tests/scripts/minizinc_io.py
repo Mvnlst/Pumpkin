@@ -3,13 +3,13 @@ import os
 
 # Create a folder to group the .dzn and .fzn file. Used for manual generation through generate.py
 def create_manual_instance_folder(n, k, seed):
-    folder = f"manual_instances/n{n}_k{k}_seed{seed}"
+    folder = f"../manual_instances/n{n}_k{k}_seed{seed}"
     os.makedirs(folder, exist_ok=True)
     return folder
 
 # Create an overarching experiment folder and subfolders for structuring the experiments
-def create_experiment_instance_folder(experiment_seed, instance_n, instance_k, instance_seed):
-    folder = f"experiment{experiment_seed}/instances/n{instance_n}_k{instance_k}/seed{instance_seed}"
+def create_experiment_instance_folder(experiment_seed, instance_n, instance_k, instance_seed, solve_type):
+    folder = f"../experiments/experiment{experiment_seed}/{solve_type}/instances/n{instance_n}_k{instance_k}/seed{instance_seed}"
     os.makedirs(folder, exist_ok=True)
     return folder
 

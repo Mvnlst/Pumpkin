@@ -6,30 +6,58 @@ import csv
 import os
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
-N_VALUES = [20, 40, 60, 80, 100] # which different n's we explore
-K_VALUES = [2, 4, 7, 10] # which different k's we explore
-INSTANCE_AMOUNT = 200 # how many times we generate an instance for each (n, k) combination to average over afterwards
-TIMEOUT = 15 * 60 # timeout in seconds
-
-
 if len(sys.argv) < 2:
     raise ValueError("Usage: python run_experiments.py <seed>")
 GLOBAL_SEED = int(sys.argv[1])
-rng = random.Random(GLOBAL_SEED)
-ALL_SEEDS = [rng.randint(0, 10**9) for _ in range(len(N_VALUES) * len(K_VALUES) * INSTANCE_AMOUNT)] # all seeds used for generation
 
-OUTPUT_DIR = f"experiment{GLOBAL_SEED}"
+OUTPUT_DIR = f"../experiments/experiment{GLOBAL_SEED}"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-OUTPUT_FILE_BASE = f"{OUTPUT_DIR}/results_base_seed{GLOBAL_SEED}.csv"
-OUTPUT_FILE_SB   = f"{OUTPUT_DIR}/results_sb_seed{GLOBAL_SEED}.csv"
 
-
-EXECUTABLE = os.path.join("..", "target", "release", "pumpkin-solver.exe")
+EXECUTABLE = os.path.join("..", "..", "target", "release", "pumpkin-solver.exe")
 MAX_WORKERS = 10 # for parallel running of instances
 
 
-MODEL_FILE = "models/circuit_model_satisfy.mzn" # circuit_model_satisfy.mzn for satisfy, circuit_model_minimize.mzn for optimization problem
+def run_experiment(solve_type, n_values, k_values, instance_amount, model_file, timeout):
+    global N_VALUES, K_VALUES, INSTANCE_AMOUNT, MODEL_FILE, TIMEOUT, SOLVE_TYPE
+
+    print(f"\nRunning {solve_type} experiments")
+
+    N_VALUES = n_values
+    K_VALUES = k_values
+    INSTANCE_AMOUNT = instance_amount
+    MODEL_FILE = model_file
+    TIMEOUT = timeout
+    SOLVE_TYPE = solve_type
+
+    os.makedirs(f"{OUTPUT_DIR}/{SOLVE_TYPE}", exist_ok=True)
+
+    # output files
+    output_base = f"{OUTPUT_DIR}/{SOLVE_TYPE}/results_base_seed{GLOBAL_SEED}.csv"
+    output_sb   = f"{OUTPUT_DIR}/{SOLVE_TYPE}/results_sb_seed{GLOBAL_SEED}.csv"
+
+    if not os.path.exists(output_base):
+        init_output_file(output_base)
+    if not os.path.exists(output_sb):
+        init_output_file(output_sb)
+
+    generate_instances()
+
+    print(f"\nRunning BASE ({SOLVE_TYPE}) experiments...")
+    run_instances(EXECUTABLE, "base", output_base)
+    
+
+    print(f"\nRunning STRONG BRIDGE ({SOLVE_TYPE}) experiments...")
+    run_instances(EXECUTABLE, "strong-bridges", output_sb)
+
+    run_analysis(output_base, output_sb)
+
+
+
+def get_seeds_for_pair(n, k, amount):
+    pair_rng = random.Random(GLOBAL_SEED + n * 10000 + k)
+    return [pair_rng.randint(0, 10**9) for _ in range(amount)]
+
 
 def init_output_file(path):
     with open(path, "w", newline="") as f:
@@ -49,22 +77,20 @@ def init_output_file(path):
 
 # Generation
 def generate_instances():
-    index = 0 # index keeping track of used seeds
     for n in N_VALUES:
         for k in K_VALUES:
             print(f"generating {INSTANCE_AMOUNT} instances for n = {n} and k = {k}...")
-            seeds_for_pair = ALL_SEEDS[index:index+INSTANCE_AMOUNT]
-            index += INSTANCE_AMOUNT
+            seeds_for_pair = get_seeds_for_pair(n, k, INSTANCE_AMOUNT)
 
             for seed in seeds_for_pair:
-                folder = f"experiment{GLOBAL_SEED}/instances/n{n}_k{k}/seed{seed}"
+                folder = f"{OUTPUT_DIR}/{SOLVE_TYPE}/instances/n{n}_k{k}/seed{seed}"
                 fzn_file = os.path.join(folder, "instance.fzn")
 
                 # only build instance if it is not here yet
                 if os.path.exists(fzn_file):
                     continue
 
-                generate_and_save(n, k, seed, model_file=MODEL_FILE, experiment_seed=GLOBAL_SEED)
+                generate_and_save(n, k, seed, model_file=MODEL_FILE, experiment_seed=GLOBAL_SEED, solve_type=SOLVE_TYPE)
 
 def ensure_binary_exists():
     print("Building with cargo...")
@@ -91,18 +117,27 @@ def load_completed(output_file):
     return completed
 
 
+def run_analysis(base_file, sb_file):
+    print(f"\nRunning analysis for:\n  {base_file}\n  {sb_file}")
+
+    try:
+        subprocess.run(
+            ["python", "analyze.py", base_file, sb_file],
+            check=True
+        )
+    except subprocess.CalledProcessError as e:
+        print(f"Analysis script failed: {e}")
+
 
 # Execution
 def run_instances(executable, mode, output_file):
     completed_set = load_completed(output_file)
 
     tasks = []
-    index = 0 # index keeping track of used seeds
 
     for n in N_VALUES:
         for k in K_VALUES:
-            seeds_for_pair = ALL_SEEDS[index:index+INSTANCE_AMOUNT]
-            index += INSTANCE_AMOUNT
+            seeds_for_pair = get_seeds_for_pair(n, k, INSTANCE_AMOUNT)
 
             for seed in seeds_for_pair:
                 key = (n, k, seed)
@@ -119,7 +154,7 @@ def run_instances(executable, mode, output_file):
     # Parellel execution
     with ProcessPoolExecutor(max_workers=MAX_WORKERS) as executor:
             futures = [
-                executor.submit(run_and_parse_instance, n, k, seed, executable, mode)
+                executor.submit(run_and_parse_instance, n, k, seed, executable, mode, TIMEOUT, SOLVE_TYPE)
                 for (n, k, seed) in tasks
             ]
 
@@ -139,8 +174,6 @@ def run_instances(executable, mode, output_file):
 
                 completed += 1
                 print(f"{completed}/{total} done (n={n}, k={k}). Solving time: {stats.get('solving time', -1)}")
-            
-            print(f"Compare base vs extension by running python analyze.py {OUTPUT_FILE_BASE} {OUTPUT_FILE_SB}")
 
 
 
@@ -170,8 +203,8 @@ def write_to_output(n, k, seed, stats, output_file):
         ])
 
 # Core logic
-def run_and_parse_instance(n, k, seed, executable, mode):
-    folder = f"experiment{GLOBAL_SEED}/instances/n{n}_k{k}/seed{seed}"
+def run_and_parse_instance(n, k, seed, executable, mode, timeout, solve_type):
+    folder = f"{OUTPUT_DIR}/{solve_type}/instances/n{n}_k{k}/seed{seed}"
     fzn_file = os.path.join(folder, "instance.fzn")
     fzn_file = fzn_file.replace("\\", "/")
     
@@ -191,7 +224,7 @@ def run_and_parse_instance(n, k, seed, executable, mode):
             cmd,
             capture_output=True,
             text=True,
-            timeout=TIMEOUT  # 12 minutes
+            timeout=timeout
         )
         stats = parse_stats(result.stdout)
 
@@ -267,21 +300,25 @@ def parse_stats(output: str):
     
     return stats
 
-# main
+
 if __name__ == "__main__":
     ensure_binary_exists()
-    # Generate all instances with correct folder structure
-    generate_instances() 
 
-    # Initialize both files
-    if not os.path.exists(OUTPUT_FILE_BASE):
-        init_output_file(OUTPUT_FILE_BASE)
-    
-    if not os.path.exists(OUTPUT_FILE_SB):
-        init_output_file(OUTPUT_FILE_SB)
+    run_experiment(
+        solve_type="sat",
+        n_values=[10, 20],
+        k_values=[2, 3, 4],
+        instance_amount=20,
+        model_file="../models/circuit_model_satisfy.mzn",
+        timeout=15 * 60
+    )
 
-    print("\nRunning BASE experiments...")
-    run_instances(EXECUTABLE, "base", OUTPUT_FILE_BASE)
+    run_experiment(
+        solve_type="opt",
+        n_values=[15, 20],
+        k_values=[2, 3],
+        instance_amount=10,
+        model_file="../models/circuit_model_minimize.mzn",
+        timeout=60 * 60
+    )
 
-    print("\nRunning STRONG BRIDGE experiments...")
-    run_instances(EXECUTABLE, "strong-bridges", OUTPUT_FILE_SB)
