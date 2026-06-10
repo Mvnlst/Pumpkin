@@ -15,4 +15,6 @@ constraint pumpkin_circuit(x);
 var int: total_cost;
 constraint total_cost = sum(i in 1..n)(dist[i, x[i]]);
 
-solve minimize total_cost;
+solve :: int_search(x, input_order, indomain_min, complete)
+       minimize total_cost;
+

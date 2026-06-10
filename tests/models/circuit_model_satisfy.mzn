@@ -12,4 +12,4 @@ constraint forall(i in 1..n)(
 
 constraint pumpkin_circuit(x);
 
-solve satisfy;
+solve :: int_search(x, input_order, indomain_min, complete) satisfy;
