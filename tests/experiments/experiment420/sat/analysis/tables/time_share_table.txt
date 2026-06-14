@@ -1,0 +1,25 @@
+\begin{table}[h]
+\centering
+\begin{tabular}{cc|ccc}
+\hline
+n & k & Base (\%) & Extension (\%) \\
+\hline
+20 & 2 & 6.0 & 94.0 \\
+20 & 3 & 6.4 & 93.6 \\
+20 & 4 & 4.8 & 95.2 \\
+40 & 2 & 3.2 & 96.8 \\
+40 & 3 & 3.6 & 96.4 \\
+40 & 4 & 2.3 & 97.7 \\
+60 & 2 & 2.1 & 97.9 \\
+60 & 3 & 2.1 & 97.9 \\
+60 & 4 & 1.7 & 98.3 \\
+80 & 2 & 1.6 & 98.4 \\
+80 & 3 & 1.5 & 98.5 \\
+80 & 4 & 1.5 & 98.5 \\
+100 & 2 & 1.5 & 98.5 \\
+100 & 3 & 1.1 & 98.9 \\
+100 & 4 & 1.2 & 98.8 \\
+\hline
+\end{tabular}
+\caption{Normalized distribution of computational effort (in \%) across base propagation,and strong bridge extension (SB & SCC).}
+\end{table}

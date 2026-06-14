@@ -46,6 +46,21 @@ os.makedirs(TABLES_DIR, exist_ok=True)
 
 
 
+
+def add_normalized_time_shares(df):
+    df = df.copy()
+
+    total = df["base time"] + df["sb time"] + df["scc time"]
+
+    df["base share"] = df["base time"] / total.replace(0, pd.NA)
+    df["sb share"] = df["sb time"] / total.replace(0, pd.NA)
+    df["scc share"] = df["scc time"] / total.replace(0, pd.NA)
+    df["ext share"]   = df["sb share"] + df["scc share"]
+
+    return df
+
+
+
 # Preprocess
 def preprocess(df):
     grouped = df.groupby(["n", "k"]).mean().reset_index()
@@ -53,6 +68,7 @@ def preprocess(df):
     return grouped
 
 group_base = preprocess(df_base) if df_base is not None else None
+df_sb = add_normalized_time_shares(df_sb)
 group_sb   = preprocess(df_sb)   if df_sb   is not None else None
 
 
@@ -147,6 +163,76 @@ def plot_metric(metric, ylabel, filename, log_scale=False, only_sb=False):
 
     plt.tight_layout()
     plt.savefig(os.path.join(PLOTS_DIR, filename), bbox_inches='tight')
+
+
+def plot_stacked_time_shares():
+    plt.figure(figsize=(12, 6))
+
+    # Sort for consistent ordering
+    df = group_sb.sort_values(["n", "k"]).copy()
+
+    # Create labels like (20,2), (40,2), ...
+    df["label"] = df.apply(lambda r: f"({int(r['n'])},{int(r['k'])})", axis=1)
+
+    x = range(len(df))
+
+    base = df["base share"]
+    scc = df["scc share"]
+    sb = df["sb share"]
+
+    # Stacked bars
+    plt.bar(x, base, label="Base", color="#4C72B0")
+    plt.bar(x, scc, bottom=base, label="SCC", color="#55A868")
+    plt.bar(x, sb, bottom=base + scc, label="SB", color="#C44E52")
+
+    # X-axis
+    plt.xticks(x, df["label"], rotation=45)
+    plt.xlabel("(n, k)")
+
+    # Y-axis
+    plt.ylabel("Relative Time Share")
+    plt.ylim(0, 1)
+
+    plt.title("Normalized Computational Effort per Instance")
+
+    plt.legend()
+    plt.grid(axis="y")
+
+    plt.tight_layout()
+    plt.savefig(os.path.join(PLOTS_DIR, "stacked_time_shares.pdf"))
+
+
+def generate_time_share_table(df_sb, output_file="time_share_table.txt"):
+
+    grouped = df_sb.groupby(["n", "k"]).mean().reset_index()
+
+    lines = []
+    lines.append("\\begin{table}[h]")
+    lines.append("\\centering")
+    lines.append("\\begin{tabular}{cc|ccc}")
+    lines.append("\\hline")
+    lines.append("n & k & Base (\\%) & Extension (\\%) \\\\")
+    lines.append("\\hline")
+
+    for _, row in grouped.iterrows():
+        n = int(row["n"])
+        k = int(row["k"])
+
+        base = row["base share"] * 100
+        ext  = row["ext share"] * 100
+
+        lines.append(
+            f"{n} & {k} & {base:.1f} & {ext:.1f} \\\\"
+        )
+
+    lines.append("\\hline")
+    lines.append("\\end{tabular}")
+    lines.append("\\caption{Normalized distribution of computational effort (in \\%) across base propagation,and strong bridge extension (SB & SCC).}")
+    lines.append("\\end{table}")
+
+    # Write to file
+    with open(output_file, "w") as f:
+        f.write("\n".join(lines))
 
 
 def generate_latex_table(df_base, df_sb, output_file="table.txt"):
@@ -262,6 +348,42 @@ def generate_propagation_table(df_base, df_sb, output_file="table_prop.txt"):
         f.write("\n".join(lines))
 
 
+def plot_time_ratios():
+    plt.figure()
+
+    ks = sorted(group_sb["k"].unique())
+    colors = {k: plt.cm.tab10(i) for i, k in enumerate(ks)}
+
+    for k in ks:
+        subset = group_sb[group_sb["k"] == k]
+
+        plt.plot(
+            subset["n"],
+            subset["base share"],
+            linestyle='-',
+            marker='o',
+            color=colors[k],
+            label=f"SB (k={k})"
+        )
+
+        plt.plot(
+            subset["n"],
+            subset["ext share"],
+            linestyle='--',
+            marker='x',
+            color=colors[k],
+            label=f"SCC (k={k})"
+        )
+
+    plt.xlabel("n")
+    plt.ylabel("Time / Total Time")
+    plt.title("Relative Time Spent in SB and SCC")
+    plt.grid(True)
+
+    plt.legend()
+    plt.tight_layout()
+    plt.savefig(os.path.join(PLOTS_DIR, "time_ratios.pdf"))
+
 
 def generate_runtime_table(df_base, df_sb, output_file="runtime_table.txt"):
 
@@ -349,15 +471,18 @@ plot_metric("propagations", "Average Propagations", "propagations.pdf", True)
 plot_metric("solving time", "Average Runtime (s)", "runtime_log.pdf", True)
 plot_metric("solving time", "Average Runtime (s)", "runtime.pdf")
 plot_metric("average lbd", "Average LBD", "lbd.pdf")
+plot_metric("average nogood length", "Average nogood Length", "nogood.pdf")
 
 if df_base is not None and df_sb is not None:
     generate_latex_table(df_base, df_sb, TABLES_DIR + "/conflicts_table.txt")
     generate_propagation_table(df_base, df_sb, TABLES_DIR + "/propagation_table.txt")
     generate_runtime_table(df_base, df_sb, TABLES_DIR + "/runtime_table.txt")
+    generate_time_share_table(df_sb, TABLES_DIR + "/time_share_table.txt")
 
 
 if df_sb is not None:
-    
+    plot_time_ratios()
+    plot_stacked_time_shares()
     plot_metric("sb prop / all prop", "SB Propagations / Total Propagations", "sb_ratio.pdf", only_sb=True)
     plot_metric("scc prop / all prop", "SCC Propagations / Total Propagations", "scc_ratio.pdf", only_sb=True)
     plot_metric("sb propagations", "Number of Strong Bridge Propagations", "sb.pdf", only_sb=True, log_scale=True)
