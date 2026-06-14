@@ -320,17 +320,17 @@ if __name__ == "__main__":
     run_experiment(
         solve_type="sat",
         n_values=[20, 40, 60, 80, 100],
-        k_values=[2, 4, 7, 10],
-        instance_amount=200,
+        k_values=[2, 3, 4],
+        instance_amount=100,
         model_file="../models/circuit_model_satisfy.mzn",
-        timeout=15 * 60
+        timeout=60 * 60
     )
 
     run_experiment(
         solve_type="opt",
         n_values=[20, 40, 60],
         k_values=[2, 3, 4],
-        instance_amount=50,
+        instance_amount=100,
         model_file="../models/circuit_model_minimize.mzn",
         timeout=60 * 60
     )

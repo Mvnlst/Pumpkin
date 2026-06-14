@@ -1,0 +1,19 @@
+\begin{table}[h]
+\centering
+\begin{tabular}{cc|ccc|c}
+\hline
+n & k & Time (base) & Time (SB) & $\Delta$ Time & Reduction (\%) \\
+\hline
+20 & 2 & 3.68e-04 & 4.04e-05 & 3.28e-04 & 89.0 \\
+20 & 3 & 0.0038 & 0.0016 & 0.0022 & 57.5 \\
+20 & 4 & 0.0613 & 0.0251 & 0.0363 & 59.1 \\
+40 & 2 & 9.61e-04 & 7.71e-05 & 8.84e-04 & 92.0 \\
+40 & 3 & 0.0308 & 0.0226 & 0.0082 & 26.7 \\
+40 & 4 & 10.58 & 3.99 & 6.58 & 62.3 \\
+60 & 2 & 0.0016 & 8.19e-05 & 0.0015 & 94.8 \\
+60 & 3 & 0.1127 & 0.1545 & -4.17e-02 & -37.0 \\
+60 & 4 & 623.20 & 247.09 & 376.11 & 60.4 \\
+\hline
+\end{tabular}
+\caption{Runtime comparison between baseline and strong bridge propagation.}
+\end{table}

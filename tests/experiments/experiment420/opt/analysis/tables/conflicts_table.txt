@@ -1,0 +1,19 @@
+\begin{table}[h]
+\centering
+\begin{tabular}{cc|ccc|c}
+\hline
+n & k & Conflicts (base) & Conflicts (SB) & $\Delta$ Conflicts & Reduction (\%) \\
+\hline
+20 & 2 & 4.3 & 0.4 & 3.9 & 91.6 \\
+20 & 3 & 67.0 & 8.3 & 58.7 & 87.7 \\
+20 & 4 & 1031.6 & 135.0 & 896.6 & 86.9 \\
+40 & 2 & 5.9 & 0.5 & 5.4 & 91.3 \\
+40 & 3 & 261.4 & 33.4 & 228.0 & 87.2 \\
+40 & 4 & 67048.5 & 7017.3 & 60031.2 & 89.5 \\
+60 & 2 & 7.3 & 0.4 & 6.9 & 94.1 \\
+60 & 3 & 624.9 & 106.8 & 518.1 & 82.9 \\
+60 & 4 & 2357846.8 & 211759.3 & 2146087.5 & 91.0 \\
+\hline
+\end{tabular}
+\caption{Conflict reduction using strong bridges}
+\end{table}
