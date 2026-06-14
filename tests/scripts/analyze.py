@@ -139,7 +139,7 @@ def plot_metric(metric, ylabel, filename, log_scale=False, only_sb=False):
 
     plt.xlabel("n (number of nodes)")
     plt.ylabel(ylabel)
-    plt.title(f"{ylabel} vs n")
+    plt.title(f"{ylabel} vs Graph Size")
     plt.grid(True)
     
     
