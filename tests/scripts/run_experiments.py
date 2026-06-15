@@ -19,13 +19,14 @@ EXECUTABLE = os.path.join("..", "..", "target", "release", "pumpkin-solver.exe")
 MAX_WORKERS = 10 # for parallel running of instances
 
 
-def run_experiment(solve_type, n_values, k_values, instance_amount, model_file, timeout):
-    global N_VALUES, K_VALUES, INSTANCE_AMOUNT, MODEL_FILE, TIMEOUT, SOLVE_TYPE
+def run_experiment(solve_type, n_values, k_values, instance_amount, model_file, timeout, excluded_combinations=[]):
+    global N_VALUES, K_VALUES, INSTANCE_AMOUNT, MODEL_FILE, TIMEOUT, SOLVE_TYPE, EXCLUDED_COMBINATIONS
 
     print(f"\nRunning {solve_type} experiments")
 
     N_VALUES = n_values
     K_VALUES = k_values
+    EXCLUDED_COMBINATIONS = excluded_combinations
     INSTANCE_AMOUNT = instance_amount
     MODEL_FILE = model_file
     TIMEOUT = timeout
@@ -80,18 +81,19 @@ def init_output_file(path):
 def generate_instances():
     for n in N_VALUES:
         for k in K_VALUES:
-            print(f"generating {INSTANCE_AMOUNT} instances for n = {n} and k = {k}...")
-            seeds_for_pair = get_seeds_for_pair(n, k, INSTANCE_AMOUNT)
+            if (n,k) not in EXCLUDED_COMBINATIONS:
+                print(f"generating {INSTANCE_AMOUNT} instances for n = {n} and k = {k}...")
+                seeds_for_pair = get_seeds_for_pair(n, k, INSTANCE_AMOUNT)
 
-            for seed in seeds_for_pair:
-                folder = f"{OUTPUT_DIR}/{SOLVE_TYPE}/instances/n{n}_k{k}/seed{seed}"
-                fzn_file = os.path.join(folder, "instance.fzn")
+                for seed in seeds_for_pair:
+                    folder = f"{OUTPUT_DIR}/{SOLVE_TYPE}/instances/n{n}_k{k}/seed{seed}"
+                    fzn_file = os.path.join(folder, "instance.fzn")
 
-                # only build instance if it is not here yet
-                if os.path.exists(fzn_file):
-                    continue
+                    # only build instance if it is not here yet
+                    if os.path.exists(fzn_file):
+                        continue
 
-                generate_and_save(n, k, seed, model_file=MODEL_FILE, experiment_seed=GLOBAL_SEED, solve_type=SOLVE_TYPE)
+                    generate_and_save(n, k, seed, model_file=MODEL_FILE, experiment_seed=GLOBAL_SEED, solve_type=SOLVE_TYPE)
 
 def ensure_binary_exists():
     print("Building with cargo...")
@@ -138,14 +140,15 @@ def run_instances(executable, mode, output_file):
 
     for n in N_VALUES:
         for k in K_VALUES:
-            seeds_for_pair = get_seeds_for_pair(n, k, INSTANCE_AMOUNT)
+            if (n,k) not in EXCLUDED_COMBINATIONS:
+                seeds_for_pair = get_seeds_for_pair(n, k, INSTANCE_AMOUNT)
 
-            for seed in seeds_for_pair:
-                key = (n, k, seed)
-                if key in completed_set:
-                    continue # we already have the stats of this instance
+                for seed in seeds_for_pair:
+                    key = (n, k, seed)
+                    if key in completed_set:
+                        continue # we already have the stats of this instance
 
-                tasks.append((n, k, seed))
+                    tasks.append((n, k, seed))
     
     total = len(N_VALUES) * len(K_VALUES) * INSTANCE_AMOUNT
     print(f"Running {len(tasks)} instances in parellel, as we already have {total - len(tasks)} written in csv")
@@ -320,18 +323,20 @@ if __name__ == "__main__":
     run_experiment(
         solve_type="sat",
         n_values=[20, 40, 60, 80, 100],
-        k_values=[2, 3, 4],
+        k_values=[2, 3, 4, 5],
+        excluded_combinations=[(100, 5)],
         instance_amount=100,
         model_file="../models/circuit_model_satisfy.mzn",
-        timeout=60 * 60
+        timeout=30 * 60
     )
 
     run_experiment(
         solve_type="opt",
-        n_values=[20, 40, 60],
-        k_values=[2, 3, 4],
+        n_values=[20, 40, 60, 80],
+        k_values=[2, 3, 4], 
+        excluded_combinations=[(80, 4)],
         instance_amount=100,
         model_file="../models/circuit_model_minimize.mzn",
-        timeout=60 * 60
+        timeout=30 * 60
     )
 
