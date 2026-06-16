@@ -52,7 +52,7 @@ def run_experiment(solve_type, n_values, k_values, instance_amount, model_file, 
     print(f"\nRunning STRONG BRIDGE ({SOLVE_TYPE}) experiments...")
     run_instances(EXECUTABLE, "strong-bridges", output_sb)
 
-    run_analysis(output_base, output_sb)
+    run_analysis(output_base, output_sb, solve_type)
 
 
 
@@ -120,12 +120,12 @@ def load_completed(output_file):
     return completed
 
 
-def run_analysis(base_file, sb_file):
+def run_analysis(base_file, sb_file, solve_type):
     print(f"\nRunning analysis for:\n  {base_file}\n  {sb_file}")
 
     try:
         subprocess.run(
-            ["python", "analyze.py", base_file, sb_file],
+            ["python", "analyze.py", base_file, sb_file, solve_type],
             check=True
         )
     except subprocess.CalledProcessError as e:

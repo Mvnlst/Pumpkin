@@ -12,11 +12,12 @@ import sys
 # or:
 # python analyze.py results_base.csv
 
-if len(sys.argv) < 2:
-    raise ValueError("Usage: python analyze.py <file1> [file2]")
+if len(sys.argv) < 3:
+    raise ValueError("Usage: python analyze.py <file1> <file2> <'sat' or 'opt'>")
 
 file1 = sys.argv[1]
-file2 = sys.argv[2] if len(sys.argv) > 2 else None
+file2 = sys.argv[2]
+mode = sys.argv[3]
 
 # Detect roles based on filename
 df_base = None
@@ -199,10 +200,10 @@ def plot_stacked_time_shares():
     plt.grid(axis="y")
 
     plt.tight_layout()
-    plt.savefig(os.path.join(PLOTS_DIR, "stacked_time_shares.pdf"))
+    plt.savefig(os.path.join(PLOTS_DIR, f"{mode}_stacked_time_shares.pdf"))
 
 
-def generate_time_share_table(df_sb, output_file="time_share_table.txt"):
+def generate_time_share_table(df_sb, output_file=f"{mode}_time_share_table.txt"):
 
     grouped = df_sb.groupby(["n", "k"]).mean().reset_index()
 
@@ -235,7 +236,7 @@ def generate_time_share_table(df_sb, output_file="time_share_table.txt"):
         f.write("\n".join(lines))
 
 
-def generate_latex_table(df_base, df_sb, output_file="table.txt"):
+def generate_latex_table(df_base, df_sb, output_file=f"{mode}_table.txt"):
     # Merge on same instances
     merged = df_base.merge(
         df_sb,
@@ -295,7 +296,7 @@ def generate_latex_table(df_base, df_sb, output_file="table.txt"):
 
 
 
-def generate_propagation_table(df_base, df_sb, output_file="table_prop.txt"):
+def generate_propagation_table(df_base, df_sb, output_file=f"{mode}_table_prop.txt"):
 
     merged = df_base.merge(
         df_sb,
@@ -382,10 +383,10 @@ def plot_time_ratios():
 
     plt.legend()
     plt.tight_layout()
-    plt.savefig(os.path.join(PLOTS_DIR, "time_ratios.pdf"))
+    plt.savefig(os.path.join(PLOTS_DIR, f"{mode}_time_ratios.pdf"))
 
 
-def generate_runtime_table(df_base, df_sb, output_file="runtime_table.txt"):
+def generate_runtime_table(df_base, df_sb, output_file=f"{mode}_runtime_table.txt"):
 
     merged = df_base.merge(
         df_sb,
@@ -466,27 +467,27 @@ def format_time(x):
 
 # Generate plots
 
-plot_metric("conflicts", "Average Conflicts", "conflicts.pdf", True)
-plot_metric("propagations", "Average Propagations", "propagations.pdf", True)
-plot_metric("solving time", "Average Runtime (s)", "runtime_log.pdf", True)
-plot_metric("solving time", "Average Runtime (s)", "runtime.pdf")
-plot_metric("average lbd", "Average LBD", "lbd.pdf")
-plot_metric("average nogood length", "Average nogood Length", "nogood.pdf")
+plot_metric("conflicts", "Average Conflicts", f"{mode}_conflicts.pdf", True)
+plot_metric("propagations", "Average Propagations", f"{mode}_propagations.pdf", True)
+plot_metric("solving time", "Average Runtime (s)", f"{mode}_runtime_log.pdf", True)
+plot_metric("solving time", "Average Runtime (s)", f"{mode}_runtime.pdf")
+plot_metric("average lbd", "Average LBD", f"{mode}_lbd.pdf")
+plot_metric("average nogood length", "Average nogood Length", f"{mode}_nogood.pdf")
 
 if df_base is not None and df_sb is not None:
-    generate_latex_table(df_base, df_sb, TABLES_DIR + "/conflicts_table.txt")
-    generate_propagation_table(df_base, df_sb, TABLES_DIR + "/propagation_table.txt")
-    generate_runtime_table(df_base, df_sb, TABLES_DIR + "/runtime_table.txt")
-    generate_time_share_table(df_sb, TABLES_DIR + "/time_share_table.txt")
+    generate_latex_table(df_base, df_sb, TABLES_DIR + f"/{mode}_conflicts_table.txt")
+    generate_propagation_table(df_base, df_sb, TABLES_DIR + f"/{mode}_propagation_table.txt")
+    generate_runtime_table(df_base, df_sb, TABLES_DIR + f"/{mode}_runtime_table.txt")
+    generate_time_share_table(df_sb, TABLES_DIR + f"/{mode}_time_share_table.txt")
 
 
 if df_sb is not None:
     plot_time_ratios()
     plot_stacked_time_shares()
-    plot_metric("sb prop / all prop", "SB Propagations / Total Propagations", "sb_ratio.pdf", only_sb=True)
-    plot_metric("scc prop / all prop", "SCC Propagations / Total Propagations", "scc_ratio.pdf", only_sb=True)
-    plot_metric("sb propagations", "Number of Strong Bridge Propagations", "sb.pdf", only_sb=True, log_scale=True)
-    plot_metric("scc propagations", "Number of SCC Propagations", "scc.pdf", only_sb=True, log_scale=True)
+    plot_metric("sb prop / all prop", "SB Propagations / Total Propagations", f"{mode}_sb_ratio.pdf", only_sb=True)
+    plot_metric("scc prop / all prop", "SCC Propagations / Total Propagations", f"{mode}_scc_ratio.pdf", only_sb=True)
+    plot_metric("sb propagations", "Number of Strong Bridge Propagations", f"{mode}_sb.pdf", only_sb=True, log_scale=True)
+    plot_metric("scc propagations", "Number of SCC Propagations", f"{mode}_scc.pdf", only_sb=True, log_scale=True)
 
 
 
