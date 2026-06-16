@@ -85,7 +85,7 @@ colors = {
 
 # Plotting function
 
-def plot_metric(metric, ylabel, filename, log_scale=False, only_sb=False):
+def plot_metric(metric, ylabel, title, filename, log_scale=False, only_sb=False):
     plt.figure()
 
     plt.rcParams.update({
@@ -156,7 +156,7 @@ def plot_metric(metric, ylabel, filename, log_scale=False, only_sb=False):
 
     plt.xlabel("n (number of nodes)")
     plt.ylabel(ylabel)
-    plt.title(f"{ylabel} vs Graph Size")
+    plt.title(title)
     plt.grid(True)
     
     
@@ -194,7 +194,7 @@ def plot_stacked_time_shares():
     plt.ylabel("Relative Time Share")
     plt.ylim(0, 1)
 
-    plt.title("Normalized Computational Effort per Instance")
+    plt.title("Propagation Time Breakdown")
 
     plt.legend()
     plt.grid(axis="y")
@@ -378,7 +378,7 @@ def plot_time_ratios():
 
     plt.xlabel("n")
     plt.ylabel("Time / Total Time")
-    plt.title("Relative Time Spent in SB and SCC")
+    plt.title("Relative Propagation Time (SB vs SCC vs Base)")
     plt.grid(True)
 
     plt.legend()
@@ -466,13 +466,14 @@ def format_time(x):
 
 
 # Generate plots
+term = "Satisfation" if mode == 'sat' else "Optimization"
 
-plot_metric("conflicts", "Average Conflicts", f"{mode}_conflicts.pdf", True)
-plot_metric("propagations", "Average Propagations", f"{mode}_propagations.pdf", True)
-plot_metric("solving time", "Average Runtime (s)", f"{mode}_runtime_log.pdf", True)
-plot_metric("solving time", "Average Runtime (s)", f"{mode}_runtime.pdf")
-plot_metric("average lbd", "Average LBD", f"{mode}_lbd.pdf")
-plot_metric("average nogood length", "Average nogood Length", f"{mode}_nogood.pdf")
+plot_metric("conflicts", "Average Conflict Amount", f"Conflict Reduction ({term})", f"{mode}_conflicts.pdf", True)
+plot_metric("propagations", "Average Propagation Amount", f"Propagation Reduction ({term})", f"{mode}_propagations.pdf", True)
+plot_metric("solving time", "Average Runtime (s)", f"Runtime Comparison ({term})", f"{mode}_runtime_log.pdf", True)
+plot_metric("solving time", "Average Runtime (s)", f"Runtime Comparison ({term})", f"{mode}_runtime.pdf")
+plot_metric("average lbd", "Average LBD", f"LBD Comparison ({term})", f"{mode}_lbd.pdf")
+plot_metric("average nogood length", "Average nogood Length", f"Nogood Length Comparison ({term})", f"{mode}_nogood.pdf")
 
 if df_base is not None and df_sb is not None:
     generate_latex_table(df_base, df_sb, TABLES_DIR + f"/{mode}_conflicts_table.txt")
@@ -484,10 +485,10 @@ if df_base is not None and df_sb is not None:
 if df_sb is not None:
     plot_time_ratios()
     plot_stacked_time_shares()
-    plot_metric("sb prop / all prop", "SB Propagations / Total Propagations", f"{mode}_sb_ratio.pdf", only_sb=True)
-    plot_metric("scc prop / all prop", "SCC Propagations / Total Propagations", f"{mode}_scc_ratio.pdf", only_sb=True)
-    plot_metric("sb propagations", "Number of Strong Bridge Propagations", f"{mode}_sb.pdf", only_sb=True, log_scale=True)
-    plot_metric("scc propagations", "Number of SCC Propagations", f"{mode}_scc.pdf", only_sb=True, log_scale=True)
+    plot_metric("sb prop / all prop", "Strong Bridge Propagation Ratio", "Share of Strong Bridge Propagations", f"{mode}_sb_ratio.pdf", only_sb=True)
+    plot_metric("scc prop / all prop", "SCC Propagation Ratio", "Share of SCC Propagations", f"{mode}_scc_ratio.pdf", only_sb=True)
+    plot_metric("sb propagations", "Average Strong Bridge Propagation Amount", "Strong Bridge Propagation Count", f"{mode}_sb.pdf", only_sb=True, log_scale=True)
+    plot_metric("scc propagations", "Average SCC Propagation Amount", "SCC Propagation Count", f"{mode}_scc.pdf", only_sb=True, log_scale=True)
 
 
 
