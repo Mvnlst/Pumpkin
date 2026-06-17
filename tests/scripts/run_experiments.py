@@ -20,7 +20,7 @@ MAX_WORKERS = 10 # for parallel running of instances
 
 
 def run_experiment(solve_type, n_values, k_values, instance_amount, model_file, timeout, excluded_combinations=[]):
-    global N_VALUES, K_VALUES, INSTANCE_AMOUNT, MODEL_FILE, TIMEOUT, SOLVE_TYPE, EXCLUDED_COMBINATIONS
+    global N_VALUES, K_VALUES, INSTANCE_AMOUNT, MODEL_FILE, TIMEOUT, SOLVE_TYPE, EXCLUDED_COMBINATIONS, OUTPUT_BASE_SAT, OUTPUT_SB_SAT, OUTPUT_BASE_OPT, OUTPUT_SB_OPT
 
     print(f"\nRunning {solve_type} experiments")
 
@@ -37,6 +37,12 @@ def run_experiment(solve_type, n_values, k_values, instance_amount, model_file, 
     # output files
     output_base = f"{OUTPUT_DIR}/{SOLVE_TYPE}/results_base_seed{GLOBAL_SEED}.csv"
     output_sb   = f"{OUTPUT_DIR}/{SOLVE_TYPE}/results_sb_seed{GLOBAL_SEED}.csv"
+    if solve_type == 'sat':
+        OUTPUT_BASE_SAT = output_base
+        OUTPUT_SB_SAT = output_sb
+    else:
+        OUTPUT_BASE_OPT = output_base
+        OUTPUT_SB_OPT = output_sb
 
     if not os.path.exists(output_base):
         init_output_file(output_base)
@@ -131,6 +137,16 @@ def run_analysis(base_file, sb_file, solve_type):
     except subprocess.CalledProcessError as e:
         print(f"Analysis script failed: {e}")
 
+def run_merged_analysis(sat_base, sat_sb, opt_base, opt_sb):
+    print(f"\nRunning combined analysis for sat and opt")
+
+    try:
+        subprocess.run(
+            ["python", "merged_data.py", sat_base, sat_sb, opt_base, opt_sb],
+            check=True
+        )
+    except subprocess.CalledProcessError as e:
+        print(f"Analysis script failed: {e}")
 
 # Execution
 def run_instances(executable, mode, output_file):
@@ -339,4 +355,7 @@ if __name__ == "__main__":
         model_file="../models/circuit_model_minimize.mzn",
         timeout=30 * 60
     )
+    run_merged_analysis(OUTPUT_BASE_SAT, OUTPUT_SB_SAT, OUTPUT_BASE_OPT, OUTPUT_SB_OPT)
+
+
 
