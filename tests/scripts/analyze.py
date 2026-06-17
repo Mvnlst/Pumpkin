@@ -26,6 +26,11 @@ df_sb = None
 def remove_timeouts(df):
     return df[df["solving time"] != -1]
 
+
+df_base_raw = pd.read_csv(file1) if "sb" not in file1 else None
+df_sb_raw = pd.read_csv(file1) if "sb" in file1 else None
+
+
 if "sb" in file1:
     df_sb = remove_timeouts(pd.read_csv(file1))
 else:
@@ -34,8 +39,10 @@ else:
 if file2:
     if "sb" in file2:
         df_sb = remove_timeouts(pd.read_csv(file2))
+        df_sb_raw = pd.read_csv(file2)
     else:
         df_base = remove_timeouts(pd.read_csv(file2))
+        df_base_raw = pd.read_csv(file2)
 
 
 OUTPUT_DIR = os.path.dirname(file1) + "/analysis"
@@ -83,7 +90,67 @@ colors = {
 }
 
 
-# Plotting function
+def generate_timeout_table(df_base_raw, df_sb_raw, output_file):
+
+    # mark timeouts
+    if df_base_raw is not None:
+        df_base_raw["timeout"] = df_base_raw["solving time"] == -1
+    
+    if df_sb_raw is not None:
+        df_sb_raw["timeout"] = df_sb_raw["solving time"] == -1
+
+    # base counts
+    base_group = None
+    if df_base_raw is not None:
+        base_group = df_base_raw.groupby(["n", "k"]).agg(
+            base_timeouts=("timeout", "sum"),
+            total=("timeout", "count")
+        ).reset_index()
+
+    # sb counts
+    sb_group = None
+    if df_sb_raw is not None:
+        sb_group = df_sb_raw.groupby(["n", "k"]).agg(
+            sb_timeouts=("timeout", "sum")
+        ).reset_index()
+
+    # merge if both exist
+    if base_group is not None and sb_group is not None:
+        grouped = base_group.merge(sb_group, on=["n", "k"])
+    elif base_group is not None:
+        grouped = base_group
+        grouped["sb_timeouts"] = "-"
+    else:
+        grouped = sb_group
+        grouped["base_timeouts"] = "-"
+
+    # build LaTeX
+    lines = []
+    lines.append("\\begin{table}[h]")
+    lines.append("\\centering")
+    lines.append("\\begin{tabular}{cc|cc}")
+    lines.append("\\hline")
+    lines.append("n & k & Base Timeouts & SB Timeouts \\\\")
+    lines.append("\\hline")
+
+    for _, row in grouped.iterrows():
+        n = int(row["n"])
+        k = int(row["k"])
+
+        base = row.get("base_timeouts", "-")
+        sb = row.get("sb_timeouts", "-")
+
+        lines.append(f"{n} & {k} & {base} & {sb} \\\\")
+
+    lines.append("\\hline")
+    lines.append("\\end{tabular}")
+    lines.append("\\caption{Number of timeouts per configuration.}")
+    lines.append("\\end{table}")
+
+    with open(output_file, "w") as f:
+        f.write("\n".join(lines))
+
+
 
 def plot_metric(metric, ylabel, title, filename, log_scale=False, only_sb=False):
     plt.figure()
@@ -480,6 +547,8 @@ if df_base is not None and df_sb is not None:
     generate_propagation_table(df_base, df_sb, TABLES_DIR + f"/{mode}_propagation_table.txt")
     generate_runtime_table(df_base, df_sb, TABLES_DIR + f"/{mode}_runtime_table.txt")
     generate_time_share_table(df_sb, TABLES_DIR + f"/{mode}_time_share_table.txt")
+    generate_timeout_table(df_base_raw, df_sb_raw, TABLES_DIR + f"/{mode}_timeouts_table.txt")
+
 
 
 if df_sb is not None:

@@ -1,0 +1,29 @@
+\begin{table}[h]
+\centering
+\begin{tabular}{cc|cc}
+\hline
+n & k & Base Timeouts & SB Timeouts \\
+\hline
+20 & 2 & 0 & 0 \\
+20 & 3 & 0 & 0 \\
+20 & 4 & 0 & 0 \\
+20 & 5 & 0 & 0 \\
+40 & 2 & 0 & 0 \\
+40 & 3 & 0 & 0 \\
+40 & 4 & 0 & 0 \\
+40 & 5 & 0 & 0 \\
+60 & 2 & 0 & 0 \\
+60 & 3 & 0 & 0 \\
+60 & 4 & 0 & 0 \\
+60 & 5 & 13 & 4 \\
+80 & 2 & 0 & 0 \\
+80 & 3 & 0 & 0 \\
+80 & 4 & 7 & 0 \\
+80 & 5 & 35 & 9 \\
+100 & 2 & 0 & 0 \\
+100 & 3 & 0 & 0 \\
+100 & 4 & 22 & 13 \\
+\hline
+\end{tabular}
+\caption{Number of timeouts per configuration.}
+\end{table}
