@@ -380,6 +380,170 @@ def generate_runtime_table(sat, opt, output_file):
         f.write("\n".join(lines))
 
 
+def generate_lbd_ng_table(sat, opt, output_file):
+
+    keys = get_all_keys(sat, opt)
+
+    lines = []
+    lines.append("\\begin{table}[h]")
+    lines.append("\\centering")
+    lines.append("\\begin{tabular}{cc|cc|cc}")
+    lines.append("\\hline")
+    lines.append(" &  & \\multicolumn{2}{c|}{SAT} & \\multicolumn{2}{c}{OPT} \\\\")
+    lines.append("n & k & LBD (\\%) & NG (\\%) & LBD (\\%) & NG (\\%) \\\\")
+    lines.append("\\hline")
+
+    for _, key in keys.iterrows():
+        n, k = int(key["n"]), int(key["k"])
+
+        sat_row = get_row(sat, n, k)
+        opt_row = get_row(opt, n, k)
+
+        # ----- SAT -----
+        if sat_row is None:
+            sat_lbd, sat_ng = "-", "-"
+        else:
+            sat_lbd = safe_reduction(
+                sat_row["average lbd_base"],
+                sat_row["average lbd_sb"]
+            )
+            sat_ng = safe_reduction(
+                sat_row["average nogood length_base"],
+                sat_row["average nogood length_sb"]
+            )
+
+        # ----- OPT -----
+        if opt_row is None:
+            opt_lbd, opt_ng = "-", "-"
+        else:
+            opt_lbd = safe_reduction(
+                opt_row["average lbd_base"],
+                opt_row["average lbd_sb"]
+            )
+            opt_ng = safe_reduction(
+                opt_row["average nogood length_base"],
+                opt_row["average nogood length_sb"]
+            )
+
+        lines.append(
+            f"{n} & {k} & {sat_lbd} & {sat_ng} & {opt_lbd} & {opt_ng} \\\\"
+        )
+
+    lines.append("\\hline")
+    lines.append("\\end{tabular}")
+    lines.append("\\caption{Relative change in LBD and nogood length (SAT vs OPT). Negative values indicate an increase.}")
+    lines.append("\\end{table}")
+
+    with open(output_file, "w") as f:
+        f.write("\n".join(lines))
+
+def generate_time_shift_table(sat_base_path, sat_sb_path,
+                              opt_base_path, opt_sb_path,
+                              output_file):
+
+    def prepare_base(path):
+        df = pd.read_csv(path, on_bad_lines='skip')
+        df = remove_timeouts(df)
+
+        total = df["solving time"]
+        base  = df["base time"]
+
+        df["f_base"]  = base / total
+        df["f_other"] = 1 - df["f_base"]
+
+        grouped = df.groupby(["n", "k"])[["f_base", "f_other"]].mean().reset_index()
+        return grouped
+
+    def prepare_ext(path):
+        df = pd.read_csv(path, on_bad_lines='skip')
+        df = remove_timeouts(df)
+
+        total = df["solving time"]
+        base  = df["base time"]
+        sb    = df["sb time"]
+        scc   = df["scc time"]
+
+        # Avoid division errors
+        total = total.replace(0, 1e-9)
+
+        df["f_base"] = base / total
+        df["f_sb"]   = sb   / total
+        df["f_scc"]  = scc  / total
+
+        # clamp sum to <= 1 (handles instrumentation overlaps)
+        df["sum_prop"] = df["f_base"] + df["f_sb"] + df["f_scc"]
+        df["sum_prop"] = df["sum_prop"].clip(upper=1.0)
+
+        df["f_other"] = 1 - df["sum_prop"]
+
+        grouped = df.groupby(["n", "k"])[
+            ["f_base", "f_sb", "f_scc", "f_other"]
+        ].mean().reset_index()
+
+        return grouped
+
+    # prepare datasets
+    sat_base = prepare_base(sat_base_path)
+    sat_ext  = prepare_ext(sat_sb_path)
+
+    opt_base = prepare_base(opt_base_path)
+    opt_ext  = prepare_ext(opt_sb_path)
+
+    keys = get_all_keys(sat_base, sat_ext)
+
+    lines = []
+    lines.append("\\begin{table}[h]")
+    lines.append("\\centering")
+    lines.append("\\begin{tabular}{cc|cc|cccc}")
+    lines.append("\\hline")
+    lines.append(" &  & \\multicolumn{2}{c|}{Baseline} & \\multicolumn{4}{c}{Extension} \\\\")
+    lines.append("n & k & Prop & Other & Base & SB & SCC & Other \\\\")
+    lines.append("\\hline")
+
+    for _, key in keys.iterrows():
+        n, k = int(key["n"]), int(key["k"])
+
+        sat_b = get_row(sat_base, n, k)
+        sat_e = get_row(sat_ext, n, k)
+
+        if sat_b is None:
+            base_vals = ["-", "-"]
+        else:
+            base_vals = [
+                f"{sat_b['f_base']*100:.1f}",
+                f"{sat_b['f_other']*100:.1f}",
+            ]
+
+        if sat_e is None:
+            ext_vals = ["-"] * 4
+        else:
+            ext_vals = [
+                f"{sat_e['f_base']*100:.1f}",
+                f"{sat_e['f_sb']*100:.1f}",
+                f"{sat_e['f_scc']*100:.1f}",
+                f"{sat_e['f_other']*100:.1f}",
+            ]
+
+        lines.append(
+            f"{n} & {k} & " +
+            " & ".join(base_vals) +
+            " & " +
+            " & ".join(ext_vals) +
+            " \\\\"
+        )
+
+    lines.append("\\hline")
+    lines.append("\\end{tabular}")
+    lines.append(
+        "\\caption{Shift in runtime distribution between baseline and strong bridge extension (in \\%). Baseline spends most time outside propagation, while the extension shifts computation toward SB and SCC propagation.}"
+    )
+    lines.append("\\end{table}")
+
+    with open(output_file, "w") as f:
+        f.write("\n".join(lines))
+
+
+
 if len(sys.argv) < 5:
     raise ValueError("Usage: python merged_data.py <sat_base> <sat_sb> <opt_base> <opt_sb>")
 
@@ -416,5 +580,21 @@ generate_sb_scc_table(
 
 
 generate_runtime_table(sat_group, opt_group, f"{OUTPUT_DIR}/runtime_merged.txt")
+
+generate_lbd_ng_table(
+    sat_group,
+    opt_group,
+    f"{OUTPUT_DIR}/lbd_ng_merged.txt"
+)
+
+
+generate_time_shift_table(
+    sat_base,
+    sat_sb,
+    opt_base,
+    opt_sb,
+    f"{OUTPUT_DIR}/time_breakdown.txt"
+)
+
 
 print("Merged tables generated")

@@ -233,7 +233,7 @@ def plot_metric(metric, ylabel, title, filename, log_scale=False, only_sb=False)
     plt.savefig(os.path.join(PLOTS_DIR, filename), bbox_inches='tight')
 
 
-def plot_stacked_time_shares():
+def plot_stacked_time_shares(term):
     plt.figure(figsize=(12, 6))
 
     # Sort for consistent ordering
@@ -261,7 +261,7 @@ def plot_stacked_time_shares():
     plt.ylabel("Relative Time Share")
     plt.ylim(0, 1)
 
-    plt.title("Propagation Time Breakdown")
+    plt.title(f"Relative Propagation Time ({term})")
 
     plt.legend()
     plt.grid(axis="y")
@@ -533,14 +533,14 @@ def format_time(x):
 
 
 # Generate plots
-term = "Satisfation" if mode == 'sat' else "Optimization"
+term = "Satisfaction" if mode == 'sat' else "Optimization"
 
-plot_metric("conflicts", "Average Conflict Amount", f"Conflict Reduction ({term})", f"{mode}_conflicts.pdf", True)
-plot_metric("propagations", "Average Propagation Amount", f"Propagation Reduction ({term})", f"{mode}_propagations.pdf", True)
-plot_metric("solving time", "Average Runtime (s)", f"Runtime Comparison ({term})", f"{mode}_runtime_log.pdf", True)
-plot_metric("solving time", "Average Runtime (s)", f"Runtime Comparison ({term})", f"{mode}_runtime.pdf")
-plot_metric("average lbd", "Average LBD", f"LBD Comparison ({term})", f"{mode}_lbd.pdf")
-plot_metric("average nogood length", "Average nogood Length", f"Nogood Length Comparison ({term})", f"{mode}_nogood.pdf")
+plot_metric("conflicts", "Average Conflict Amount", f"Conflicts ({term})", f"{mode}_conflicts.pdf", True)
+plot_metric("propagations", "Average Propagation Amount", f"Propagations ({term})", f"{mode}_propagations.pdf", True)
+plot_metric("solving time", "Average Runtime (s)", f"Runtime ({term})", f"{mode}_runtime_log.pdf", True)
+plot_metric("solving time", "Average Runtime (s)", f"Runtime ({term})", f"{mode}_runtime.pdf")
+plot_metric("average lbd", "Average LBD", f"LBD ({term})", f"{mode}_lbd.pdf")
+plot_metric("average nogood length", "Average nogood Length", f"Nogood Length ({term})", f"{mode}_nogood.pdf")
 
 if df_base is not None and df_sb is not None:
     generate_latex_table(df_base, df_sb, TABLES_DIR + f"/{mode}_conflicts_table.txt")
@@ -553,7 +553,7 @@ if df_base is not None and df_sb is not None:
 
 if df_sb is not None:
     plot_time_ratios()
-    plot_stacked_time_shares()
+    plot_stacked_time_shares(term)
     plot_metric("sb prop / all prop", "Strong Bridge Propagation Ratio", "Share of Strong Bridge Propagations", f"{mode}_sb_ratio.pdf", only_sb=True)
     plot_metric("scc prop / all prop", "SCC Propagation Ratio", "Share of SCC Propagations", f"{mode}_scc_ratio.pdf", only_sb=True)
     plot_metric("sb propagations", "Average Strong Bridge Propagation Amount", "Strong Bridge Propagation Count", f"{mode}_sb.pdf", only_sb=True, log_scale=True)
