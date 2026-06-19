@@ -10,6 +10,6 @@ constraint forall(i in 1..n)(
     x[i] in allowed[i]
 );
 
-constraint pumpkin_circuit(x);
+constraint circuit(x);
 
 solve :: int_search(x, input_order, indomain_min, complete) satisfy;

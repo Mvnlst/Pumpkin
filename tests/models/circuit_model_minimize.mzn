@@ -10,7 +10,7 @@ constraint forall(i in 1..n)(
     x[i] in allowed[i]
 );
 
-constraint pumpkin_circuit(x);
+constraint circuit(x);
 
 var int: total_cost;
 constraint total_cost = sum(i in 1..n)(dist[i, x[i]]);
